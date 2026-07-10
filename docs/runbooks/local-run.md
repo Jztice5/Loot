@@ -32,7 +32,7 @@ py -3.12 -m unittest discover -s tests -p 'test_*.py'
 预期输出包含：
 
 ```text
-Ran 12 tests
+Ran 17 tests
 OK
 ```
 
