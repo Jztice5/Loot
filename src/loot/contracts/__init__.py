@@ -21,6 +21,7 @@ from loot.contracts.enums import (
 )
 from loot.contracts.events import EventEnvelope
 from loot.contracts.market import Instrument, PriceZone
+from loot.contracts.market_data import MarketBar, MarketBarClosedEvent, MarketSnapshot
 from loot.contracts.monitoring import CandidateEvent, MonitoringSubscription
 from loot.contracts.portfolio import (
     Position,
@@ -44,6 +45,9 @@ __all__ = [
     "InstrumentStatus",
     "InstrumentType",
     "Market",
+    "MarketBar",
+    "MarketBarClosedEvent",
+    "MarketSnapshot",
     "MonitoringSubscription",
     "MonitoringSubscriptionStatus",
     "Position",

@@ -13,6 +13,7 @@
 - 核心契约设计：[architecture/contracts/loot-contracts-v0.1.md](architecture/contracts/loot-contracts-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Signal State Machine：[architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
+- Crypto 行情数据 Provider：[architecture/market-domains/crypto-market-data-provider-v0.1.md](architecture/market-domains/crypto-market-data-provider-v0.1.md)
 
 ## 开发过程
 

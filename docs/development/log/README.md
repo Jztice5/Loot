@@ -9,6 +9,7 @@
 | 2026-07-10 | 设计上下文分层与维护机制 | [2026-07-10-context-management.md](2026-07-10-context-management.md) | `architecture`、`memory`、`log`、`review`、`runbook`、`AGENTS` |
 | 2026-07-10 | 核心契约骨架 | [2026-07-10-contracts-foundation.md](2026-07-10-contracts-foundation.md) | `contracts`、`EventEnvelope`、`PositionEvent`、`SignalEvent`、`unittest` |
 | 2026-07-10 | Signal State Machine v0.1 | [2026-07-10-signal-state-machine.md](2026-07-10-signal-state-machine.md) | `SignalStateMachine`、`DecisionTicket`、`SignalEvent`、`idempotency` |
+| 2026-07-10 | Crypto 行情数据 Provider v0.1 | [2026-07-10-crypto-market-data-provider.md](2026-07-10-crypto-market-data-provider.md) | `MarketBar`、`MarketSnapshot`、`FakeCryptoProvider`、`OKX` |
 
 新过程记录可从 [TEMPLATE.md](TEMPLATE.md) 复制结构。
 

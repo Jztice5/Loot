@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-当前仓库已建立初始 Python 项目骨架和核心 contracts。`main.py` 仍是 PyCharm 示例脚本，正式 API、worker 和数据库尚未启动。
+当前仓库已建立初始 Python 项目骨架、核心 contracts、Signal State Machine 和 Crypto 行情 Provider。`main.py` 仍是 PyCharm 示例脚本，正式 API、worker 和数据库尚未启动。
 
 ## 运行示例脚本
 
@@ -32,7 +32,7 @@ py -3.12 -m unittest discover -s tests -p 'test_*.py'
 预期输出包含：
 
 ```text
-Ran 17 tests
+Ran 26 tests
 OK
 ```
 
@@ -40,4 +40,46 @@ OK
 
 ```bash
 py -3.12 -m compileall src tests
+```
+
+## OKX 公共行情 Smoke
+
+该命令只读取 OKX public REST K 线，不需要 API key，不访问账户，不下单。
+
+```powershell
+$env:PYTHONPATH='D:\my-projects\Loot\src'
+@'
+from uuid import uuid4
+from loot.contracts import Instrument, InstrumentStatus, InstrumentType, Market, Timeframe
+from loot.domains.crypto import OkxRestCryptoProvider
+
+instrument = Instrument(
+    instrument_id=uuid4(),
+    market=Market.CRYPTO,
+    venue='OKX',
+    symbol='BTC-USDT',
+    instrument_type=InstrumentType.SPOT,
+    quote_currency='USDT',
+    timezone='UTC',
+    price_scale=2,
+    status=InstrumentStatus.ACTIVE,
+)
+snapshot = OkxRestCryptoProvider(timeout_seconds=10.0).fetch_recent_bars(
+    instrument,
+    Timeframe.H1,
+    limit=2,
+)
+print(
+    snapshot.source_provider,
+    len(snapshot.bars),
+    snapshot.bars[-1].symbol,
+    snapshot.bars[-1].close_price,
+)
+'@ | py -3.12 -
+```
+
+已验证输出示例：
+
+```text
+okx.public_rest 2 BTC-USDT <close_price>
 ```
