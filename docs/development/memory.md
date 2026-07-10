@@ -40,6 +40,8 @@ WatchItem / TradingPlan / PositionEvent
 - 上下文维护遵循“稳定设计进 architecture、当前状态进 memory、过程推理进 log、可执行步骤进 runbook、阶段结论进 review”。
 - 已创建全局 Codex skill `vibe-context-manager`，可复用到其他长期 vibe coding 项目。
 - 第一批 contracts 使用 Pydantic v2 不可变模型，禁止额外字段，并要求跨模块时间为 timezone-aware UTC。
+- 已将 `code-standards` Java 版业务注释思路迁移到 Loot Python 代码：
+  核心契约 docstring 需要标明业务描述、场景、原因、调用链和规则。
 - 当前测试使用标准库 `unittest`，避免 Phase 0 依赖 pytest 安装。
 
 ## 历史索引

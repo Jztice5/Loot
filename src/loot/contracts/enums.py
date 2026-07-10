@@ -1,4 +1,15 @@
-"""Enumerations shared by Loot contracts."""
+"""Loot 跨模块枚举契约。
+
+业务描述:
+    固定市场、状态、周期、优先级和信号类型等业务词汇，避免各模块自造字符串。
+
+业务原因:
+    枚举是事件、数据库投影、测试样例和前端展示的共同语言。这里变化会影响
+    Provider、Policy Gate、Signal State Machine 和 Alert Center。
+
+调用链:
+    contracts.enums -> domain contracts -> tests/replay/API consumers
+"""
 
 from __future__ import annotations
 
@@ -6,7 +17,7 @@ from enum import StrEnum
 
 
 class Market(StrEnum):
-    """Supported market bounded contexts."""
+    """市场 bounded context。"""
 
     CRYPTO = "CRYPTO"
     US_EQUITY = "US_EQUITY"
@@ -14,7 +25,7 @@ class Market(StrEnum):
 
 
 class InstrumentType(StrEnum):
-    """Supported instrument categories."""
+    """可监控标的类型。"""
 
     SPOT = "SPOT"
     PERPETUAL = "PERPETUAL"
@@ -23,7 +34,7 @@ class InstrumentType(StrEnum):
 
 
 class InstrumentStatus(StrEnum):
-    """Lifecycle status for an instrument."""
+    """标的生命周期状态。"""
 
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
@@ -31,7 +42,7 @@ class InstrumentStatus(StrEnum):
 
 
 class Timeframe(StrEnum):
-    """Canonical monitoring timeframes."""
+    """标准监控周期。"""
 
     M1 = "1m"
     M5 = "5m"
@@ -43,7 +54,7 @@ class Timeframe(StrEnum):
 
 
 class WatchItemStatus(StrEnum):
-    """Watch item lifecycle states."""
+    """自选项生命周期状态。"""
 
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
@@ -51,7 +62,7 @@ class WatchItemStatus(StrEnum):
 
 
 class TradingPlanStatus(StrEnum):
-    """Trading plan lifecycle states."""
+    """交易计划生命周期状态。"""
 
     DRAFT = "DRAFT"
     ACTIVE = "ACTIVE"
@@ -61,7 +72,7 @@ class TradingPlanStatus(StrEnum):
 
 
 class Direction(StrEnum):
-    """Trading plan directional bias."""
+    """交易计划方向偏向。"""
 
     LONG = "LONG"
     SHORT = "SHORT"
@@ -69,7 +80,7 @@ class Direction(StrEnum):
 
 
 class ExitMode(StrEnum):
-    """Supported exit management modes."""
+    """退出管理方式。"""
 
     FIXED_TARGET = "FIXED_TARGET"
     STRUCTURE_TRAILING = "STRUCTURE_TRAILING"
@@ -77,14 +88,14 @@ class ExitMode(StrEnum):
 
 
 class PositionSide(StrEnum):
-    """Position side."""
+    """持仓方向。"""
 
     LONG = "LONG"
     SHORT = "SHORT"
 
 
 class PositionStatus(StrEnum):
-    """Position projection states."""
+    """持仓投影状态。"""
 
     OPEN = "OPEN"
     PARTIALLY_CLOSED = "PARTIALLY_CLOSED"
@@ -92,7 +103,7 @@ class PositionStatus(StrEnum):
 
 
 class PositionEventType(StrEnum):
-    """Append-only manual position event types."""
+    """手动持仓追加事件类型。"""
 
     OPEN = "OPEN"
     ADD = "ADD"
@@ -102,7 +113,7 @@ class PositionEventType(StrEnum):
 
 
 class MonitoringSubscriptionStatus(StrEnum):
-    """Derived monitoring subscription states."""
+    """派生监控订阅状态。"""
 
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
@@ -111,7 +122,7 @@ class MonitoringSubscriptionStatus(StrEnum):
 
 
 class Priority(StrEnum):
-    """Priority used by signals, candidates, and alerts."""
+    """候选、信号和提醒共用优先级。"""
 
     LOW = "LOW"
     NORMAL = "NORMAL"
@@ -120,7 +131,7 @@ class Priority(StrEnum):
 
 
 class Actionability(StrEnum):
-    """Whether a signal can be acted on immediately."""
+    """信号是否具备立即行动价值。"""
 
     ACTIONABLE_NOW = "ACTIONABLE_NOW"
     WATCH_ONLY = "WATCH_ONLY"
@@ -129,7 +140,7 @@ class Actionability(StrEnum):
 
 
 class SignalState(StrEnum):
-    """Signal state machine states."""
+    """Signal State Machine 状态。"""
 
     OBSERVING = "OBSERVING"
     ARMED = "ARMED"
@@ -142,7 +153,7 @@ class SignalState(StrEnum):
 
 
 class SignalType(StrEnum):
-    """Initial signal categories."""
+    """初始信号类型。"""
 
     MARKET_STRUCTURE = "MARKET_STRUCTURE"
     VOLUME_BREAKOUT = "VOLUME_BREAKOUT"
@@ -151,7 +162,7 @@ class SignalType(StrEnum):
 
 
 class CandidateType(StrEnum):
-    """Deterministic prefilter candidate categories."""
+    """确定性预筛选候选类型。"""
 
     PRICE_ZONE_APPROACH = "PRICE_ZONE_APPROACH"
     STRUCTURE_BREAKOUT = "STRUCTURE_BREAKOUT"

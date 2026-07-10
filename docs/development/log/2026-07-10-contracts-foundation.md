@@ -33,10 +33,13 @@ flowchart TD
 - 测试先使用 `unittest`，因为当前 Python 3.12 环境已有 Pydantic 但没有 pytest。
 - `PositionEvent` 保持 OPEN、ADD、REDUCE、MOVE_STOP、CLOSE；TradingPlan 取消不进入 PositionEvent。
 - `TradingPlan`、`Position`、`CandidateEvent`、`EvidenceSet`、`DecisionTicket`、`SignalInstance` 补充时间顺序约束。
+- 参考 `code-standards` Java 注释规范，把业务五要素、调用链和决策注释迁移为
+  Python docstring 规则，避免核心契约只留下技术描述。
 
 ## 改动点
 
 - 新增 `pyproject.toml`。
+- 新增 `.Codex-standards.md`，固定 Loot Python 代码的业务 docstring 规则。
 - 补充 `.gitignore` 的 Python 缓存、构建产物、虚拟环境和 IDE 元数据规则。
 - 新增 `src/loot/__init__.py`。
 - 新增 `src/loot/contracts/`：
@@ -47,6 +50,9 @@ flowchart TD
   - `portfolio.py`
   - `monitoring.py`
   - `signals.py`
+- 为核心 contracts 补充中文业务 docstring，覆盖业务描述、场景、调用链和规则。
+- 为关键 validator 补充业务决策注释，说明为什么要拦截时间倒序、状态无变化、
+  缺少幂等键或缺少成交字段。
 - 新增 `tests/unit/contracts/test_contracts.py`。
 - 新增 `docs/architecture/contracts/loot-contracts-v0.1.md`。
 
