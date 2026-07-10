@@ -10,12 +10,14 @@
 ## 架构设计
 
 - 系统宏观架构：[architecture/system/loot-system-architecture-v0.1.md](architecture/system/loot-system-architecture-v0.1.md)
+- 核心契约设计：[architecture/contracts/loot-contracts-v0.1.md](architecture/contracts/loot-contracts-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 
 ## 开发过程
 
 - 开发过程索引：[development/log/README.md](development/log/README.md)
 - 设计上下文分层过程：[development/log/2026-07-10-context-management.md](development/log/2026-07-10-context-management.md)
+- 核心契约骨架过程：[development/log/2026-07-10-contracts-foundation.md](development/log/2026-07-10-contracts-foundation.md)
 - 过程记录模板：[development/log/TEMPLATE.md](development/log/TEMPLATE.md)
 
 ## 评审记录

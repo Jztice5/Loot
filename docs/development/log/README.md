@@ -7,6 +7,7 @@
 | 日期 | 主题 | 文档 | 关键词 |
 | --- | --- | --- | --- |
 | 2026-07-10 | 设计上下文分层与维护机制 | [2026-07-10-context-management.md](2026-07-10-context-management.md) | `architecture`、`memory`、`log`、`review`、`runbook`、`AGENTS` |
+| 2026-07-10 | 核心契约骨架 | [2026-07-10-contracts-foundation.md](2026-07-10-contracts-foundation.md) | `contracts`、`EventEnvelope`、`PositionEvent`、`SignalEvent`、`unittest` |
 
 新过程记录可从 [TEMPLATE.md](TEMPLATE.md) 复制结构。
 
