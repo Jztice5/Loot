@@ -18,6 +18,7 @@
 - 提供 `CryptoMarketDataProvider` 抽象，隔离具体交易所。
 - 提供 `FakeCryptoProvider`，用于本地闭环、Golden Case 和无外网测试。
 - 提供 `OkxRestCryptoProvider`，读取 OKX public REST K 线。
+- 默认只返回已收盘 K 线；盘中未收盘 K 线必须显式开启。
 - 保持只读边界，不接账户、不接私有 API、不下单。
 
 非目标：
@@ -72,6 +73,7 @@ Provider 只能生成行情事实，不能直接产生 Signal，也不能绕过 
 - `low_price` 必须覆盖 open、close、high。
 - `closed_at` 必须晚于 `opened_at`。
 - `received_at` 不能早于 `opened_at`。
+- `is_closed=False` 可以进入快照，但不能发布 `MarketBarClosedEvent`。
 
 ### 3.2 MarketSnapshot
 
@@ -80,10 +82,12 @@ Provider 只能生成行情事实，不能直接产生 Signal，也不能绕过 
 业务规则：
 
 - `bars` 至少一根。
+- `bars` 在契约中保存为 tuple，避免消费者在内存中追加或重排行情事实。
 - 所有 `bars` 必须与 snapshot 的 market、instrument、timeframe、source_provider 一致。
 - `bars` 必须按 `opened_at` 升序排列。
 - 同一 snapshot 内 `provider_event_id` 不能重复。
 - `snapshot_key` 是 replay 和幂等输入，不是用户展示字段。
+- `latest_bar` 可能是未收盘 K 线；PreFilter 默认应使用 `latest_closed_bar`。
 
 ### 3.3 MarketBarClosedEvent
 
@@ -102,13 +106,20 @@ Provider 只能生成行情事实，不能直接产生 Signal，也不能绕过 
 市场领域依赖抽象接口：
 
 ```text
-fetch_recent_bars(instrument, timeframe, limit) -> MarketSnapshot
+fetch_recent_bars(
+    instrument,
+    timeframe,
+    limit,
+    include_unclosed=False,
+) -> MarketSnapshot
 ```
 
 所有实现必须满足：
 
 - 只读取公开行情。
 - 只返回标准契约。
+- 默认返回已收盘 K 线。
+- 如果调用方需要盘中最新 K 线，必须显式传 `include_unclosed=True`。
 - 不读取账户、余额、订单或交易权限。
 - 不直接写 Candidate、Signal 或 Position。
 
@@ -140,6 +151,7 @@ fetch_recent_bars(instrument, timeframe, limit) -> MarketSnapshot
 - 不需要 API key。
 - 只接受 `Instrument.venue = OKX`。
 - 当前只实现最近 K 线读取，不实现历史翻页和 WebSocket。
+- 默认过滤 `confirm != "1"` 的未收盘 K 线；显式 `include_unclosed=True` 时才保留。
 
 OKX 原始 K 线数组按字段顺序解析：
 
@@ -187,7 +199,7 @@ py -3.12 -m unittest discover -s tests -p 'test_*.py'
 结果：
 
 ```text
-Ran 26 tests
+Ran 30 tests
 OK
 ```
 
@@ -205,11 +217,18 @@ py -3.12 -m compileall src tests
 okx.public_rest 2 BTC-USDT <close_price>
 ```
 
+PyCharm Terminal smoke 已验证默认返回已收盘 K 线：
+
+```text
+is_closed= True
+latest_closed_same= True
+```
+
 ## 8. 后续扩展
 
 下一步建议：
 
-1. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot` 产生 `CandidateEvent`。
+1. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
 2. 建立 Crypto 第一批 Golden Case。
 3. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
 4. 为 OKX Provider 增加历史缺口补拉和数据质量标记。

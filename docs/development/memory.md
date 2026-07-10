@@ -65,8 +65,8 @@ WatchItem / TradingPlan / PositionEvent
 - 当前文档已按系统级和闭环级分层。
 - `git diff --check` 已用于格式检查。
 - `py -3.12 -m compileall src tests`：通过。
-- `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：26 tests OK。
-- OKX public REST smoke：通过，返回 2 根 BTC-USDT 1H K 线。
+- `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：30 tests OK。
+- OKX public REST smoke：通过，默认返回 2 根已收盘 BTC-USDT 1H K 线。
 
 ## 未完成
 
@@ -78,7 +78,7 @@ WatchItem / TradingPlan / PositionEvent
 
 优先级建议：
 
-1. 做 FakeCryptoPreFilter，从 `MarketSnapshot` 产生第一条 `CandidateEvent`。
+1. 做 FakeCryptoPreFilter，从 `MarketSnapshot.latest_closed_bar` 产生第一条 `CandidateEvent`。
 2. 用 Crypto 自选跑通一条 Candidate 到 Signal 的最小闭环。
 3. 补第一批 Golden Case，验证重复行情、重复候选和重复 DecisionTicket 不重复迁移。
 4. 设计持久化层中的 DecisionTicket 消费标记、SignalTransition 和 outbox。

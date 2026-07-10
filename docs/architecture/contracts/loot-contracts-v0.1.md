@@ -82,8 +82,10 @@ src/loot/contracts/
 `MarketSnapshot` 是一次预筛选或 replay 的行情窗口，要求：
 
 - 所有 bars 属于同一 market、instrument、timeframe 和 source_provider。
+- bars 在契约内保存为 tuple，避免消费者追加或重排行情事实。
 - bars 按 opened_at 升序排列。
 - 同一 snapshot 内 provider_event_id 不能重复。
+- `latest_bar` 可能未收盘，策略默认应使用 `latest_closed_bar`。
 - snapshot_key 作为 replay 和幂等输入。
 
 `MarketBarClosedEvent` 预留给后续事件总线使用，只允许发布已确认收盘 K 线。

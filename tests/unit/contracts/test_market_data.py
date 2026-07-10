@@ -7,7 +7,13 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-from loot.contracts import Market, MarketBar, MarketSnapshot, Timeframe
+from loot.contracts import (
+    Market,
+    MarketBar,
+    MarketBarClosedEvent,
+    MarketSnapshot,
+    Timeframe,
+)
 
 from tests.unit.contracts.test_contracts import RaisesValidationError
 
@@ -24,6 +30,7 @@ def sample_bar(
     timeframe: Timeframe = Timeframe.H1,
     opened_at: datetime | None = None,
     provider_event_id: str = "fake:BTC-USDT:h1:1",
+    is_closed: bool = True,
 ) -> MarketBar:
     """Build a valid MarketBar with stable defaults."""
 
@@ -45,7 +52,7 @@ def sample_bar(
         close_price=Decimal("105"),
         volume=Decimal("12"),
         quote_volume=Decimal("1260"),
-        is_closed=True,
+        is_closed=is_closed,
         received_at=bar_opened_at + timedelta(hours=1),
     )
 
@@ -90,6 +97,39 @@ class MarketDataContractTest(unittest.TestCase):
         )
 
         self.assertEqual(snapshot.bars[0].provider_event_id, "fake:1")
+        self.assertIsInstance(snapshot.bars, tuple)
+        self.assertEqual(snapshot.latest_bar, second)
+        self.assertEqual(snapshot.latest_closed_bar, second)
+
+    def test_market_snapshot_exposes_latest_closed_bar(self) -> None:
+        instrument_id = uuid4()
+        closed_bar = sample_bar(
+            instrument_id=instrument_id,
+            opened_at=aware_now(),
+            provider_event_id="fake:closed",
+            is_closed=True,
+        )
+        unclosed_bar = sample_bar(
+            instrument_id=instrument_id,
+            opened_at=aware_now() + timedelta(hours=1),
+            provider_event_id="fake:unclosed",
+            is_closed=False,
+        )
+
+        snapshot = MarketSnapshot(
+            id=uuid4(),
+            market=Market.CRYPTO,
+            instrument_id=instrument_id,
+            timeframe=Timeframe.H1,
+            source_provider="fake.crypto",
+            as_of=aware_now() + timedelta(hours=1, minutes=30),
+            bars=[closed_bar, unclosed_bar],
+            snapshot_key="snapshot:with-unclosed",
+        )
+
+        self.assertEqual(snapshot.latest_bar, unclosed_bar)
+        self.assertEqual(snapshot.latest_closed_bar, closed_bar)
+        self.assertEqual(snapshot.closed_bars, (closed_bar,))
 
     def test_market_snapshot_rejects_duplicate_provider_event_ids(self) -> None:
         instrument_id = uuid4()
@@ -114,6 +154,20 @@ class MarketDataContractTest(unittest.TestCase):
                 as_of=aware_now() + timedelta(hours=2),
                 bars=[first, second],
                 snapshot_key="snapshot:duplicate",
+            )
+
+    def test_bar_closed_event_rejects_unclosed_bar(self) -> None:
+        bar = sample_bar(is_closed=False)
+
+        with RaisesValidationError("bar must be closed"):
+            MarketBarClosedEvent(
+                id=uuid4(),
+                market=bar.market,
+                instrument_id=bar.instrument_id,
+                timeframe=bar.timeframe,
+                bar=bar,
+                occurred_at=bar.closed_at,
+                dedupe_key="bar:unclosed",
             )
 
 

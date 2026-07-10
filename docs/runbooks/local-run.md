@@ -32,7 +32,7 @@ py -3.12 -m unittest discover -s tests -p 'test_*.py'
 预期输出包含：
 
 ```text
-Ran 26 tests
+Ran 30 tests
 OK
 ```
 
@@ -72,8 +72,9 @@ snapshot = OkxRestCryptoProvider(timeout_seconds=10.0).fetch_recent_bars(
 print(
     snapshot.source_provider,
     len(snapshot.bars),
-    snapshot.bars[-1].symbol,
-    snapshot.bars[-1].close_price,
+    snapshot.latest_bar.symbol,
+    snapshot.latest_bar.close_price,
+    snapshot.latest_bar.is_closed,
 )
 '@ | py -3.12 -
 ```
@@ -81,5 +82,5 @@ print(
 已验证输出示例：
 
 ```text
-okx.public_rest 2 BTC-USDT <close_price>
+okx.public_rest 2 BTC-USDT <close_price> True
 ```

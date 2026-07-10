@@ -18,7 +18,8 @@
 业务规则:
     - 时间统一归一化为 UTC aware datetime。
     - OHLC 必须满足 high/low 包含 open/close。
-    - 快照内所有 K 线必须属于同一市场、标的和周期。
+    - 快照内所有 K 线必须属于同一市场、标的、周期和 Provider。
+    - 快照 bars 使用 tuple 保存，避免消费者在内存中追加或重排行情事实。
     - provider_event_id 和 snapshot_key 是后续幂等与 replay 的关键输入。
 """
 
@@ -125,7 +126,8 @@ class MarketSnapshot(ContractModel):
         Provider.fetch_recent_bars -> MarketSnapshot -> PreFilter -> CandidateEvent
 
     业务规则:
-        bars 必须按 opened_at 升序排列；同一快照内 provider_event_id 不能重复。
+        bars 必须按 opened_at 升序排列；同一快照内 provider_event_id 不能重复；
+        PreFilter 应优先使用 latest_closed_bar，避免未收盘 K 线制造假信号。
     """
 
     id: UUID
@@ -134,8 +136,36 @@ class MarketSnapshot(ContractModel):
     timeframe: Timeframe
     source_provider: str
     as_of: datetime
-    bars: list[MarketBar] = Field(min_length=1)
+    bars: tuple[MarketBar, ...] = Field(min_length=1)
     snapshot_key: str
+
+    @property
+    def latest_bar(self) -> MarketBar:
+        """返回快照中的最新 K 线，可能是未收盘 K 线。"""
+
+        return self.bars[-1]
+
+    @property
+    def closed_bars(self) -> tuple[MarketBar, ...]:
+        """返回快照中已确认收盘的 K 线。"""
+
+        return tuple(bar for bar in self.bars if bar.is_closed)
+
+    @property
+    def latest_closed_bar(self) -> MarketBar | None:
+        """返回最新已收盘 K 线。
+
+        业务点:
+            PreFilter 的默认入口应使用已收盘 K 线，除非策略明确声明支持盘中更新。
+
+        调用链:
+            MarketSnapshot -> latest_closed_bar -> PreFilter -> CandidateEvent
+        """
+
+        for bar in reversed(self.bars):
+            if bar.is_closed:
+                return bar
+        return None
 
     @field_validator("source_provider", "snapshot_key")
     @classmethod
@@ -171,7 +201,7 @@ class MarketSnapshot(ContractModel):
                 raise ValueError("bars must be ordered by opened_at ascending")
             previous_opened_at = bar.opened_at
 
-        if self.as_of < self.bars[-1].opened_at:
+        if self.as_of < self.latest_bar.opened_at:
             raise ValueError("as_of must not be earlier than latest bar opened_at")
 
         return self

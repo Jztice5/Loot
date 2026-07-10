@@ -120,11 +120,101 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
         self.assertIn("/api/v5/market/candles?", captured[0][0])
         self.assertIn("instId=BTC-USDT", captured[0][0])
         self.assertIn("bar=1H", captured[0][0])
+        self.assertIn("limit=3", captured[0][0])
         self.assertEqual(captured[0][1], 3.0)
         self.assertEqual(snapshot.source_provider, "okx.public_rest")
         self.assertEqual(snapshot.bars[0].open_price, 100)
         self.assertEqual(snapshot.bars[1].close_price, 109)
         self.assertTrue(snapshot.bars[0].is_closed)
+
+    def test_okx_provider_filters_unclosed_bar_by_default(self) -> None:
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            return json.dumps(
+                {
+                    "code": "0",
+                    "msg": "",
+                    "data": [
+                        [
+                            "1720573200000",
+                            "106",
+                            "112",
+                            "101",
+                            "109",
+                            "11",
+                            "11",
+                            "1199",
+                            "0",
+                        ],
+                        [
+                            "1720569600000",
+                            "100",
+                            "110",
+                            "95",
+                            "105",
+                            "10",
+                            "10",
+                            "1050",
+                            "1",
+                        ],
+                    ],
+                }
+            ).encode("utf-8")
+
+        provider = OkxRestCryptoProvider(http_get=fake_http_get)
+        snapshot = provider.fetch_recent_bars(
+            sample_crypto_instrument(),
+            Timeframe.H1,
+            limit=2,
+        )
+
+        self.assertEqual(len(snapshot.bars), 1)
+        self.assertEqual(snapshot.latest_closed_bar, snapshot.latest_bar)
+        self.assertTrue(snapshot.latest_bar.is_closed)
+
+    def test_okx_provider_can_include_unclosed_bar_explicitly(self) -> None:
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            return json.dumps(
+                {
+                    "code": "0",
+                    "msg": "",
+                    "data": [
+                        [
+                            "1720573200000",
+                            "106",
+                            "112",
+                            "101",
+                            "109",
+                            "11",
+                            "11",
+                            "1199",
+                            "0",
+                        ],
+                        [
+                            "1720569600000",
+                            "100",
+                            "110",
+                            "95",
+                            "105",
+                            "10",
+                            "10",
+                            "1050",
+                            "1",
+                        ],
+                    ],
+                }
+            ).encode("utf-8")
+
+        provider = OkxRestCryptoProvider(http_get=fake_http_get)
+        snapshot = provider.fetch_recent_bars(
+            sample_crypto_instrument(),
+            Timeframe.H1,
+            limit=2,
+            include_unclosed=True,
+        )
+
+        self.assertEqual(len(snapshot.bars), 2)
+        self.assertFalse(snapshot.latest_bar.is_closed)
+        self.assertEqual(snapshot.latest_closed_bar.close_price, 105)
 
     def test_okx_provider_rejects_error_response(self) -> None:
         def fake_http_get(url: str, timeout: float) -> bytes:

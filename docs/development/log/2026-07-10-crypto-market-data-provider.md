@@ -45,7 +45,7 @@ py -3.12 -m unittest discover -s tests -p 'test_*.py'
 结果：
 
 ```text
-Ran 26 tests
+Ran 30 tests
 OK
 ```
 

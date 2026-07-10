@@ -26,6 +26,7 @@
 ## 评审记录
 
 - 设计分层校对备忘录：[reviews/loot-design-layering-review-2026-07-10.md](reviews/loot-design-layering-review-2026-07-10.md)
+- Crypto 行情地基评审：[reviews/crypto-market-data-foundation-review-2026-07-10.md](reviews/crypto-market-data-foundation-review-2026-07-10.md)
 
 ## Runbooks
 

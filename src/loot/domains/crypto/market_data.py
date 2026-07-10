@@ -98,6 +98,7 @@ class CryptoMarketDataProvider(Protocol):
         timeframe: Timeframe,
         *,
         limit: int,
+        include_unclosed: bool = False,
     ) -> MarketSnapshot:
         """拉取最近 K 线并返回标准行情快照。
 
@@ -147,6 +148,7 @@ class FakeCryptoProvider:
         timeframe: Timeframe,
         *,
         limit: int,
+        include_unclosed: bool = False,
     ) -> MarketSnapshot:
         """生成最近 K 线窗口。
 
@@ -249,11 +251,13 @@ class OkxRestCryptoProvider:
         timeframe: Timeframe,
         *,
         limit: int,
+        include_unclosed: bool = False,
     ) -> MarketSnapshot:
         """读取 OKX 最近 K 线。
 
         业务点:
-            只读取公共 K 线并标准化，不读取账户、不创建订单、不持有 API key。
+            默认只返回已收盘 K 线；需要盘中最新 K 线时必须显式传入
+            include_unclosed=True。
 
         调用链:
             validate_okx_instrument -> call_public_rest -> parse_rows -> build_snapshot
@@ -263,12 +267,13 @@ class OkxRestCryptoProvider:
         if instrument.venue.upper() != "OKX":
             raise ValueError("OkxRestCryptoProvider only accepts venue=OKX instruments")
         _ensure_limit(limit, max_limit=300)
+        request_limit = _okx_request_limit(limit, include_unclosed=include_unclosed)
 
         query = urlencode(
             {
                 "instId": instrument.symbol,
                 "bar": _okx_bar_code(timeframe),
-                "limit": str(limit),
+                "limit": str(request_limit),
             }
         )
         url = f"{self.base_url.rstrip('/')}/api/v5/market/candles?{query}"
@@ -284,7 +289,7 @@ class OkxRestCryptoProvider:
             raise CryptoProviderError("OKX candles response did not include data rows")
 
         received_at = datetime.now(UTC)
-        bars = [
+        normalized_bars = [
             self._parse_candle_row(
                 instrument,
                 timeframe,
@@ -293,6 +298,14 @@ class OkxRestCryptoProvider:
             )
             for row in reversed(rows)
         ]
+        bars = _select_return_bars(
+            normalized_bars,
+            limit=limit,
+            include_unclosed=include_unclosed,
+        )
+        if not bars:
+            raise CryptoProviderError("OKX candles response did not include usable data rows")
+
         return _build_snapshot(
             provider_name=self.provider_name,
             instrument=instrument,
@@ -360,6 +373,23 @@ def _ensure_limit(limit: int, *, max_limit: int) -> None:
         raise ValueError("limit must be at least 1")
     if limit > max_limit:
         raise ValueError(f"limit must not exceed {max_limit}")
+
+
+def _okx_request_limit(limit: int, *, include_unclosed: bool) -> int:
+    if include_unclosed:
+        return limit
+    return min(limit + 1, 300)
+
+
+def _select_return_bars(
+    bars: list[MarketBar],
+    *,
+    limit: int,
+    include_unclosed: bool,
+) -> list[MarketBar]:
+    # 决策: 默认丢弃未收盘 K 线，防止 PreFilter 被盘中噪声误唤醒。
+    selected_bars = bars if include_unclosed else [bar for bar in bars if bar.is_closed]
+    return selected_bars[-limit:]
 
 
 def _timeframe_duration(timeframe: Timeframe) -> timedelta:
