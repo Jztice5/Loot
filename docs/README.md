@@ -21,6 +21,7 @@
 - 设计上下文分层过程：[development/log/2026-07-10-context-management.md](development/log/2026-07-10-context-management.md)
 - 核心契约骨架过程：[development/log/2026-07-10-contracts-foundation.md](development/log/2026-07-10-contracts-foundation.md)
 - Signal State Machine 过程：[development/log/2026-07-10-signal-state-machine.md](development/log/2026-07-10-signal-state-machine.md)
+- Crypto 行情 Provider 过程：[development/log/2026-07-10-crypto-market-data-provider.md](development/log/2026-07-10-crypto-market-data-provider.md)
 - 过程记录模板：[development/log/TEMPLATE.md](development/log/TEMPLATE.md)
 
 ## 评审记录
@@ -32,6 +33,11 @@
 
 - 本地运行说明：[runbooks/local-run.md](runbooks/local-run.md)
 - 上下文健康检查：[runbooks/context-health-check.md](runbooks/context-health-check.md)
+
+## 需求与计划
+
+- 需求管理：[planning/需求管理.md](planning/需求管理.md)
+- 日常开发计划：[planning/开发计划.md](planning/开发计划.md)
 
 ## 目录分工
 

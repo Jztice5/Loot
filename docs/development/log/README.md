@@ -10,6 +10,7 @@
 | 2026-07-10 | 核心契约骨架 | [2026-07-10-contracts-foundation.md](2026-07-10-contracts-foundation.md) | `contracts`、`EventEnvelope`、`PositionEvent`、`SignalEvent`、`unittest` |
 | 2026-07-10 | Signal State Machine v0.1 | [2026-07-10-signal-state-machine.md](2026-07-10-signal-state-machine.md) | `SignalStateMachine`、`DecisionTicket`、`SignalEvent`、`idempotency` |
 | 2026-07-10 | Crypto 行情数据 Provider v0.1 | [2026-07-10-crypto-market-data-provider.md](2026-07-10-crypto-market-data-provider.md) | `MarketBar`、`MarketSnapshot`、`FakeCryptoProvider`、`OKX` |
+| 2026-07-10 | 日终收尾与需求规划 | [2026-07-10-day-closeout.md](2026-07-10-day-closeout.md) | `closeout`、`需求管理`、`REQ-0005`、`REQ-0006`、`REQ-0007` |
 
 新过程记录可从 [TEMPLATE.md](TEMPLATE.md) 复制结构。
 

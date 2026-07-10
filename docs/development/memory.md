@@ -14,6 +14,7 @@
 - 当前状态机设计：`docs/architecture/signal-state-machine/loot-signal-state-machine-v0.1.md`。
 - 当前 Crypto 行情设计：`docs/architecture/market-domains/crypto-market-data-provider-v0.1.md`。
 - 当前闭环设计：`docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md`。
+- 当前需求管理：`docs/planning/需求管理.md`。
 - 当前上下文维护机制：`docs/README.md` 作为入口，`development/memory.md` 记录状态，`development/log` 记录过程，`reviews` 记录阶段结论，`runbooks` 记录可执行步骤。
 
 ## 设计主线
@@ -67,6 +68,7 @@ WatchItem / TradingPlan / PositionEvent
 - `py -3.12 -m compileall src tests`：通过。
 - `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：30 tests OK。
 - OKX public REST smoke：通过，默认返回 2 根已收盘 BTC-USDT 1H K 线。
+- 下一环节需求规划已沉淀到 `docs/planning/需求管理.md`。
 
 ## 未完成
 
@@ -78,9 +80,9 @@ WatchItem / TradingPlan / PositionEvent
 
 优先级建议：
 
-1. 做 FakeCryptoPreFilter，从 `MarketSnapshot.latest_closed_bar` 产生第一条 `CandidateEvent`。
-2. 用 Crypto 自选跑通一条 Candidate 到 Signal 的最小闭环。
-3. 补第一批 Golden Case，验证重复行情、重复候选和重复 DecisionTicket 不重复迁移。
+1. 按 `REQ-0005` 做 Crypto Candidate PreFilter 最小版本。
+2. 补 `REQ-0006` Crypto Golden Case 最小集。
+3. 再进入 `REQ-0007` Candidate 到 Signal 的最小串联。
 4. 设计持久化层中的 DecisionTicket 消费标记、SignalTransition 和 outbox。
 5. 再开始 Skill Runtime 和 Agent 接入。
 
