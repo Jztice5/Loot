@@ -1,7 +1,7 @@
 # 开发过程记忆
 
 > 项目级开发记忆，只保留当前状态、关键历史索引和下一步。
-> 具体功能点的过程记录放在 [log/](log/README.md)。
+> 具体功能点的过程记录通过 [log/](log/README.md) 按季度索引。
 
 ## 当前状态
 
@@ -16,8 +16,10 @@
 - 当前 Crypto 行情设计：`docs/architecture/market-domains/crypto-market-data-provider-v0.1.md`。
 - 当前闭环设计：`docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md`。
 - 当前决策运行时设计：`docs/architecture/runtime/decision-flow-v0.1.md`。
-- 当前需求管理：`docs/planning/需求管理.md`。
+- 当前季度规划：`docs/planning/2026-Q3/规划总览-2026-Q3.md`。
+- 当前需求管理：`docs/planning/2026-Q3/需求管理-2026-Q3.md`。
 - 当前上下文维护机制：`docs/README.md` 作为入口，`development/memory.md` 记录状态，`development/log` 记录过程，`reviews` 记录阶段结论，`runbooks` 记录可执行步骤。
+- 时间型资料按 `yyyy-Qn` 归档；季度总览、需求管理和开发计划文件名显式带季度标记。
 
 ## 设计主线
 
@@ -78,14 +80,15 @@ WatchItem / TradingPlan / PositionEvent
 
 | 日期 | 主题 | 摘要 | 详情 |
 | --- | --- | --- | --- |
-| 2026-07-10 | 初始设计分层 | 参考智能客服项目文档体系，建立 Loot 的 architecture / development / planning / reviews / runbooks 分层 | [设计分层校对备忘录](../reviews/loot-design-layering-review-2026-07-10.md) |
-| 2026-07-10 | 上下文维护机制优化 | 补齐过程日志、上下文健康检查 runbook 和 AGENTS 收尾归档规则 | [过程记录](log/2026-07-10-context-management.md) |
-| 2026-07-10 | 核心契约骨架 | 建立 pyproject、src/loot/contracts 和第一批契约测试 | [过程记录](log/2026-07-10-contracts-foundation.md) |
-| 2026-07-10 | Signal State Machine v0.1 | 建立状态机运行时、合法迁移表和内存幂等测试 | [过程记录](log/2026-07-10-signal-state-machine.md) |
-| 2026-07-10 | Crypto 行情 Provider v0.1 | 定义 MarketBar/MarketSnapshot，接入 FakeCryptoProvider 和 OKX public REST K 线 | [过程记录](log/2026-07-10-crypto-market-data-provider.md) |
-| 2026-07-14 | 决策链路设计回归 | 拆分 Proposal、PolicyEvaluation 和 Ticket，固定事务、幂等、失败与追踪边界 | [过程记录](log/2026-07-14-decision-flow-design-regression.md) |
-| 2026-07-14 | 第二轮地基约束 | 用现有代码复现四类风险，补齐 Snapshot、Policy、Ticket 和 Signal 生命周期约束 | [第二轮复核](../reviews/loot-foundation-second-review-2026-07-14.md) |
-| 2026-07-14 | REQ-0009 地基修正 | 落地 Snapshot 内容寻址、闭合时间、Signal 初始化和 Ticket 指纹回归 | [过程记录](log/2026-07-14-req-0009-foundation-invariants.md) |
+| 2026-07-10 | 初始设计分层 | 参考智能客服项目文档体系，建立 Loot 的 architecture / development / planning / reviews / runbooks 分层 | [设计分层校对备忘录](../reviews/2026-Q3/loot-design-layering-review-2026-07-10.md) |
+| 2026-07-10 | 上下文维护机制优化 | 补齐过程日志、上下文健康检查 runbook 和 AGENTS 收尾归档规则 | [过程记录](log/2026-Q3/2026-07-10-context-management.md) |
+| 2026-07-10 | 核心契约骨架 | 建立 pyproject、src/loot/contracts 和第一批契约测试 | [过程记录](log/2026-Q3/2026-07-10-contracts-foundation.md) |
+| 2026-07-10 | Signal State Machine v0.1 | 建立状态机运行时、合法迁移表和内存幂等测试 | [过程记录](log/2026-Q3/2026-07-10-signal-state-machine.md) |
+| 2026-07-10 | Crypto 行情 Provider v0.1 | 定义 MarketBar/MarketSnapshot，接入 FakeCryptoProvider 和 OKX public REST K 线 | [过程记录](log/2026-Q3/2026-07-10-crypto-market-data-provider.md) |
+| 2026-07-14 | 决策链路设计回归 | 拆分 Proposal、PolicyEvaluation 和 Ticket，固定事务、幂等、失败与追踪边界 | [过程记录](log/2026-Q3/2026-07-14-decision-flow-design-regression.md) |
+| 2026-07-14 | 第二轮地基约束 | 用现有代码复现四类风险，补齐 Snapshot、Policy、Ticket 和 Signal 生命周期约束 | [第二轮复核](../reviews/2026-Q3/loot-foundation-second-review-2026-07-14.md) |
+| 2026-07-14 | REQ-0009 地基修正 | 落地 Snapshot 内容寻址、闭合时间、Signal 初始化和 Ticket 指纹回归 | [过程记录](log/2026-Q3/2026-07-14-req-0009-foundation-invariants.md) |
+| 2026-07-14 | 上下文季度化 | 时间型资料迁入 2026-Q3，稳定知识入口保持固定 | [过程记录](log/2026-Q3/2026-07-14-quarterly-doc-organization.md) |
 
 ## 已验证
 
@@ -95,7 +98,7 @@ WatchItem / TradingPlan / PositionEvent
 - `py -3.12 -m compileall src tests`：通过。
 - `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：41 tests OK。
 - OKX public REST smoke：通过，默认返回 2 根已收盘 BTC-USDT 1H K 线。
-- 下一环节需求规划已沉淀到 `docs/planning/需求管理.md`。
+- 下一环节需求规划已沉淀到 `docs/planning/2026-Q3/需求管理-2026-Q3.md`。
 - 2026-07-14 Markdown 本地链接扫描：通过，无失效链接。
 - 2026-07-14 `git diff --check`：通过，仅有仓库行尾转换提示。
 - 2026-07-14 第二轮复核：30 tests OK，`compileall` 通过；额外复现 Snapshot identity
@@ -120,4 +123,5 @@ WatchItem / TradingPlan / PositionEvent
 4. 按 `REQ-0008` 设计持久化 DecisionTicket 消费、SignalTransition 和 outbox。
 5. 再开始 Skill Runtime 和 Agent 接入。
 
-日常计划记录放在 [../planning/开发计划.md](../planning/开发计划.md)。
+日常计划记录放在
+[开发计划 2026-Q3](../planning/2026-Q3/开发计划-2026-Q3.md)。

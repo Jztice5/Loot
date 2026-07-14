@@ -15,7 +15,8 @@
   - `MarketSnapshot.bars` 改为 tuple。
   - `OkxRestCryptoProvider` 默认过滤未收盘 K 线。
   - 增加 `latest_closed_bar` 等安全读取入口。
-- 新增 `docs/planning/需求管理.md`，沉淀下一环节需求。
+- 新增需求管理文档，现归档为
+  `docs/planning/2026-Q3/需求管理-2026-Q3.md`。
 
 ## 当前基线
 

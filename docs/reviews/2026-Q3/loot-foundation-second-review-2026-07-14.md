@@ -79,9 +79,9 @@ stored_position_impact=FIRST
 
 详细设计见：
 
-- [决策运行时与授权链路](../architecture/runtime/decision-flow-v0.1.md)
-- [Crypto 行情 Provider](../architecture/market-domains/crypto-market-data-provider-v0.1.md)
-- [Signal State Machine](../architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
+- [决策运行时与授权链路](../../architecture/runtime/decision-flow-v0.1.md)
+- [Crypto 行情 Provider](../../architecture/market-domains/crypto-market-data-provider-v0.1.md)
+- [Signal State Machine](../../architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 
 ## 5. 实现收口
 

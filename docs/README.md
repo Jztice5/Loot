@@ -4,7 +4,7 @@
 
 - 当前项目状态：[development/memory.md](development/memory.md)
 - 设计分层索引：[architecture/README.md](architecture/README.md)
-- 今天/近期计划：[planning/开发计划.md](planning/开发计划.md)
+- 当前季度规划：[planning/2026-Q3/规划总览-2026-Q3.md](planning/2026-Q3/规划总览-2026-Q3.md)
 - 本地运行说明：[runbooks/local-run.md](runbooks/local-run.md)
 
 ## 架构设计
@@ -19,20 +19,13 @@
 ## 开发过程
 
 - 开发过程索引：[development/log/README.md](development/log/README.md)
-- 设计上下文分层过程：[development/log/2026-07-10-context-management.md](development/log/2026-07-10-context-management.md)
-- 核心契约骨架过程：[development/log/2026-07-10-contracts-foundation.md](development/log/2026-07-10-contracts-foundation.md)
-- Signal State Machine 过程：[development/log/2026-07-10-signal-state-machine.md](development/log/2026-07-10-signal-state-machine.md)
-- Crypto 行情 Provider 过程：[development/log/2026-07-10-crypto-market-data-provider.md](development/log/2026-07-10-crypto-market-data-provider.md)
-- 决策链路设计回归：[development/log/2026-07-14-decision-flow-design-regression.md](development/log/2026-07-14-decision-flow-design-regression.md)
-- 第二轮地基约束收敛：[development/log/2026-07-14-foundation-constraints.md](development/log/2026-07-14-foundation-constraints.md)
+- 2026-Q3 开发过程总览：[development/log/2026-Q3/开发过程总览-2026-Q3.md](development/log/2026-Q3/开发过程总览-2026-Q3.md)
 - 过程记录模板：[development/log/TEMPLATE.md](development/log/TEMPLATE.md)
 
 ## 评审记录
 
-- 设计分层校对备忘录：[reviews/loot-design-layering-review-2026-07-10.md](reviews/loot-design-layering-review-2026-07-10.md)
-- Crypto 行情地基评审：[reviews/crypto-market-data-foundation-review-2026-07-10.md](reviews/crypto-market-data-foundation-review-2026-07-10.md)
-- 端到端设计回归评审：[reviews/loot-end-to-end-design-review-2026-07-14.md](reviews/loot-end-to-end-design-review-2026-07-14.md)
-- 地基第二轮复核：[reviews/loot-foundation-second-review-2026-07-14.md](reviews/loot-foundation-second-review-2026-07-14.md)
+- 评审跨季度索引：[reviews/README.md](reviews/README.md)
+- 2026-Q3 评审记录总览：[reviews/2026-Q3/评审记录总览-2026-Q3.md](reviews/2026-Q3/评审记录总览-2026-Q3.md)
 
 ## Runbooks
 
@@ -41,17 +34,19 @@
 
 ## 需求与计划
 
-- 需求管理：[planning/需求管理.md](planning/需求管理.md)
-- 日常开发计划：[planning/开发计划.md](planning/开发计划.md)
+- 规划跨季度索引：[planning/README.md](planning/README.md)
+- 规划总览 2026-Q3：[planning/2026-Q3/规划总览-2026-Q3.md](planning/2026-Q3/规划总览-2026-Q3.md)
+- 需求管理 2026-Q3：[planning/2026-Q3/需求管理-2026-Q3.md](planning/2026-Q3/需求管理-2026-Q3.md)
+- 开发计划 2026-Q3：[planning/2026-Q3/开发计划-2026-Q3.md](planning/2026-Q3/开发计划-2026-Q3.md)
 
 ## 目录分工
 
 ```text
 docs/
   architecture/   稳定架构设计：系统级、组件级、功能闭环级设计
-  development/    开发记忆和功能点过程记录
-  planning/       每日计划和项目管理记录
-  reviews/        设计评审、校对和阶段结论
+  development/    当前 memory 固定；过程日志按 yyyy-Qn 归档
+  planning/       需求、计划和季度总览按 yyyy-Qn 归档并显式命名
+  reviews/        设计评审和阶段结论按 yyyy-Qn 归档
   runbooks/       本地运行、测试、排障手册
 ```
 
@@ -63,6 +58,7 @@ docs/
 - `development/log` 记录一次功能推进中的判断过程、证据、改动和验证。
 - `reviews` 记录阶段校对结论，避免设计债和实现债散落在聊天里。
 - `runbooks` 记录可复用操作步骤，避免每次从设计文档里翻命令。
+- 时间型资料进入 `yyyy-Qn/`；季度总览、需求管理和开发计划文件名必须包含季度标记。
 
 ## 上下文维护规则
 

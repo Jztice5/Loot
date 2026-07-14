@@ -42,11 +42,20 @@ git diff --cached --check
 - 重要判断有过程记录。
 - 过程记录说明为什么这样判断，不只是列出改动。
 - 已晋升为架构规则的内容不再只藏在 log 里。
+- 时间型日志位于正确的 `yyyy-Qn/`，季度总览文件名包含季度。
 
 ### 5. Review 健康
 
 - 阶段结论、风险、缺口和复核清单在 `docs/reviews/` 可见。
 - 未定事项能追溯到 architecture open questions 或 review memo。
+- 评审位于对应季度目录，且季度评审总览文件名包含季度。
+
+### 5.1 Planning 健康
+
+- 当前季度具有 `规划总览-yyyy-Qn.md`、`需求管理-yyyy-Qn.md` 和
+  `开发计划-yyyy-Qn.md`。
+- `docs/planning/README.md` 只做跨季度导航，并指向当前季度。
+- memory 和项目文档入口指向同一个当前季度。
 
 ### 6. Runbook 健康
 

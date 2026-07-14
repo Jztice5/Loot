@@ -19,7 +19,7 @@
 flowchart TD
     Entry["docs/README.md"] --> Memory["development/memory.md"]
     Entry --> Arch["architecture/README.md"]
-    Entry --> Plan["planning/开发计划.md"]
+    Entry --> Plan["planning/2026-Q3/开发计划-2026-Q3.md"]
     Entry --> Runbook["runbooks/"]
     Arch --> System["architecture/system"]
     Arch --> Loop["architecture/signal-monitoring"]
@@ -42,7 +42,8 @@ flowchart TD
 - 将宏观设计归入 `docs/architecture/system/loot-system-architecture-v0.1.md`。
 - 将第一条功能闭环设计归入 `docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md`。
 - 新增 `docs/development/memory.md`、`docs/development/log/README.md`、`docs/development/log/TEMPLATE.md`。
-- 新增 `docs/reviews/loot-design-layering-review-2026-07-10.md`。
+- 新增评审文档，现归档为
+  `docs/reviews/2026-Q3/loot-design-layering-review-2026-07-10.md`。
 - 新增 `docs/runbooks/local-run.md` 和 `docs/runbooks/context-health-check.md`。
 - 更新根 `AGENTS.md`，加入上下文收尾归档动作。
 

@@ -6,7 +6,8 @@
 2. `docs/development/memory.md`
 3. `docs/architecture/README.md`
 4. `docs/architecture/system/loot-system-architecture-v0.1.md`
-5. 与任务相关的 `docs/architecture/*/*.md` 或 `docs/development/log/*.md`
+5. 与任务相关的 `docs/architecture/*/*.md` 或
+   `docs/development/log/<yyyy-Qn>/*.md`
 
 ## Project Definition
 
@@ -73,10 +74,23 @@ Codex 实现功能前必须：
 
 - 稳定边界、契约、状态机或非目标变化时，更新 `docs/architecture/`。
 - 当前状态、验证命令、未完成事项或下一步变化时，更新 `docs/development/memory.md`。
-- 出现有保留价值的推理、debug 或放弃方案时，写入 `docs/development/log/`。
-- 形成阶段结论、风险判断或复核清单时，写入 `docs/reviews/`。
+- 出现有保留价值的推理、debug 或放弃方案时，写入
+  `docs/development/log/<yyyy-Qn>/`。
+- 形成阶段结论、风险判断或复核清单时，写入 `docs/reviews/<yyyy-Qn>/`。
 - 出现可重复操作命令时，写入 `docs/runbooks/`。
 - 未来 Codex 必须遵守的新硬约束，提升到本文件。
+
+## Quarterly Document Rules
+
+1. 时间型资料按事件发生日期进入 `yyyy-Qn/`，包括 development log、review 和 planning。
+2. 季度总览文件必须显式包含季度：
+   - `开发过程总览-yyyy-Qn.md`
+   - `评审记录总览-yyyy-Qn.md`
+   - `规划总览-yyyy-Qn.md`
+3. 需求和开发计划必须命名为 `需求管理-yyyy-Qn.md`、`开发计划-yyyy-Qn.md`。
+4. 各时间型目录根 `README.md` 只做跨季度导航，不复制季度内容。
+5. architecture、memory 和 runbook 不按季度拆分；它们按稳定职责和主题维护。
+6. 跨季度未完成需求必须在新季度文档中标注来源，旧季度业务结论不覆盖改写。
 
 ## Definition of Done
 
