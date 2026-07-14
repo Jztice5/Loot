@@ -36,8 +36,16 @@ make check
 .venv/bin/python main.py
 ```
 
-预期：上下文检查、脚本编译、41 个 unittest 和示例入口全部通过；项目 Skill 与全局镜像
-校验一致。
+实际环境：macOS Apple Silicon，Python 3.13.9，Git 提交 `9d3b85f`。
+
+实际结果：
+
+- context check 通过：45 个 Markdown 文件、117 个本地链接、memory 105 行、Skill 341 行。
+- `src`、`tests` 和 `scripts` 的 `compileall` 通过。
+- `Ran 41 tests`，`OK`。
+- `main.py` 输出 `Hi, PyCharm`。
+- 项目 Skill 与全局镜像均通过 validator，SHA-256 为
+  `a0f9796ac0846a2ca8bcc0b0fe97e3172d7199d75d21ca9daa77804173989c44`。
 
 ## 后续
 
