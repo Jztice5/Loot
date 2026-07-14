@@ -28,6 +28,8 @@ Windows PowerShell：
 - 三类时间上下文的权威定义和入口标记是否完整。
 - Markdown 本地链接目标是否存在。
 - planning、development log 和 reviews 的季度目录、文件命名及总览登记。
+- memory、规划总览和历史 log 是否越界复制需求队列或动态计划标题。
+- 季度目录是否重新引入流水式开发计划。
 - `memory.md` 和项目 Skill 是否超过加载预算。
 - 项目 Skill 与已安装的全局镜像是否一致。
 - Markdown、检查脚本、Makefile 和 pyproject 中的尾随空白与文件末尾换行。
@@ -47,7 +49,7 @@ rg --files docs
 自动检查负责结构正确，人工检查负责判断内容是否真实。以下语义目前仍需人工确认：
 
 - memory 描述的阶段与当前代码是否一致。
-- 下一步与当前季度需求顺序是否一致。
+- memory 的活跃需求是否与唯一 In Progress 需求一致，且没有复制 Planned 队列。
 - architecture 是否混入临时实现流水账。
 - log 中重复出现的规则是否应晋升到 architecture 或 AGENTS。
 - review 中登记的风险是否已关闭或仍需跟踪。
@@ -57,12 +59,14 @@ rg --files docs
 ### 1. 入口和单一事实源
 
 - `docs/README.md` 两跳内可找到 memory、architecture、planning、reviews 和 runbooks。
-- 根 `README.md` 只保留稳定介绍和入口，不维护需求状态或下一步。
-- 当前状态只在 `docs/development/memory.md` 维护；需求状态只在当前季度 planning 维护。
+- 根 `README.md` 只保留稳定介绍和入口，不维护动态需求状态或计划队列。
+- 当前执行与验证基线只在 `docs/development/memory.md` 维护；需求状态和队列只在当前
+  季度需求管理维护。
 
 ### 2. Memory
 
-- 描述当前真实阶段、活跃限制、未完成和下一步。
+- 描述当前真实阶段、活跃需求、阻塞、恢复点和验证基线。
+- 不复制完整未完成清单、Planned 队列或历史索引。
 - 详细设计链接到 architecture，不复制稳定规则全文。
 - 当前验证记录包含日期、OS、Python、Git 基线和实际命令。
 - 超过约 150 行或无法在两分钟内扫完时立即瘦身。
@@ -82,7 +86,9 @@ rg --files docs
 - architecture 记录稳定边界、契约、状态机、失败处理和验收标准。
 - log 记录一次工作中的判断、证据、改动和验证。
 - review 记录阶段结论、风险、缺口和复核清单。
-- planning 使用当前季度的总览、需求管理和开发计划，不把业务状态复制到索引根目录。
+- planning 使用当前季度总览和需求管理；需求管理独占状态、依赖和计划队列，不维护季度
+  流水式开发计划。
+- development log 的遗留判断标为历史快照，不使用“下一步”“后续”或“下一环节”标题。
 
 ### 4. Runbook 和 Project Skills
 

@@ -4,9 +4,8 @@ Loot the market before it loots you.
 
 Loot 是一个面向个人自选与手动持仓的多市场信号监控系统，目标是持续跟踪 Crypto、美股和 A 股中的关键价格结构、量价变化和信息事件，在值得关注的状态变化发生时提醒用户，减少反复看盘。
 
-当前状态、验证基线和下一步只在
-[开发过程记忆](docs/development/memory.md) 与
-[规划跨季度索引](docs/planning/README.md) 中维护，避免入口摘要与真实进度漂移。
+当前执行状态与验证基线只在[开发过程记忆](docs/development/memory.md) 维护；需求状态、
+依赖和计划队列只在[规划跨季度索引](docs/planning/README.md) 维护，避免入口摘要与真实进度漂移。
 
 ## 核心边界
 

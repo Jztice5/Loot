@@ -18,9 +18,10 @@
 
 ## Context Source of Truth
 
-- 根 `README.md` 只保留稳定介绍和入口，不复制当前需求状态或下一步。
-- 当前阶段、验证基线、未完成事项和下一步以 `docs/development/memory.md` 为准。
-- 需求状态和推进顺序以当前季度 `docs/planning/<yyyy-Qn>/` 为准。
+- 根 `README.md` 只保留稳定介绍和入口，不复制动态需求状态或计划队列。
+- 当前执行、阻塞、恢复点和验证基线以 `docs/development/memory.md` 为准。
+- 需求状态、依赖、验收标准和计划队列以当前季度 `需求管理-yyyy-Qn.md` 为准。
+- development log 是过去式证据；其中的遗留判断即使仍未完成，也不是当前计划指令。
 - 历史验证必须保留日期和环境；不得把旧设备上的通过结果表述为当前机器已复验。
 
 ## Temporal Context Model
@@ -109,7 +110,8 @@ Codex 实现功能前必须：
 每次完成实质设计或实现后，必须检查上下文是否需要收尾：
 
 - 稳定边界、契约、状态机或非目标变化时，更新 `docs/architecture/`。
-- 当前状态、验证命令、未完成事项或下一步变化时，更新 `docs/development/memory.md`。
+- 当前执行、阻塞、恢复点或验证基线变化时，更新 `docs/development/memory.md`。
+- 需求状态、依赖或计划队列变化时，更新当前季度 `需求管理-yyyy-Qn.md`。
 - 出现有保留价值的推理、debug 或放弃方案时，写入
   `docs/development/log/<yyyy-Qn>/`。
 - 形成阶段结论、风险判断或复核清单时，写入 `docs/reviews/<yyyy-Qn>/`。
@@ -125,10 +127,11 @@ Codex 实现功能前必须：
    - `开发过程总览-yyyy-Qn.md`
    - `评审记录总览-yyyy-Qn.md`
    - `规划总览-yyyy-Qn.md`
-3. 需求和开发计划必须命名为 `需求管理-yyyy-Qn.md`、`开发计划-yyyy-Qn.md`。
+3. 需求管理必须命名为 `需求管理-yyyy-Qn.md`，并独占需求状态和计划队列。
 4. 各时间型目录根 `README.md` 只做跨季度导航，不复制季度内容。
 5. architecture、memory 和 runbook 不按季度拆分；它们按稳定职责和主题维护。
 6. 跨季度未完成需求必须在新季度文档中标注来源，旧季度业务结论不覆盖改写。
+7. 不维护季度流水式开发计划；复杂需求需要实施计划时，创建与 REQ 绑定的专题计划。
 
 ## Definition of Done
 

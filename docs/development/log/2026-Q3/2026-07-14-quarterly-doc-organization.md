@@ -37,7 +37,7 @@ Loot 的 architecture、development log、planning、reviews 和 runbooks 已经
 - 搜索旧 planning、review 和 log 路径，确保不再残留过期引用。
 - 执行 `git diff --check`。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 进入 2026-Q4 时创建新的季度目录和带季度名的总览文档。未完成需求写入 Q4 需求管理并
 标注来源为 2026-Q3，Q3 文档转为只读历史。

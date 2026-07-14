@@ -73,7 +73,7 @@ DecisionProposal 需要引用既有 signal_id。初始 OBSERVING Signal 由状�
   `authorized_transition`。
 - 当前内存幂等不能覆盖重启、多实例和消息确认前崩溃。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 1. 先完成 REQ-0006 Golden Case。
 2. 再实现 REQ-0005 Crypto Candidate PreFilter。

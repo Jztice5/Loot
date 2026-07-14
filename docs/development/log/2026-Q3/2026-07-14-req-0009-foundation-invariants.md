@@ -75,7 +75,7 @@ git diff --check passed with line-ending warnings only.
 PyCharm MCP 本轮未暴露 Loot 项目连接，因此验证使用同一工作区的 PowerShell 和
 Python 3.12 完成。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 1. `REQ-0006`：先把 Crypto Golden Case 输入和业务预期写成可读样例。
 2. `REQ-0005`：按 Golden Case 实现只读取已收盘 K 线的 PreFilter。

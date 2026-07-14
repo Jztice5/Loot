@@ -98,6 +98,27 @@ def check_temporal_context_model(report: Report) -> None:
                 report.error(f"temporal context marker missing in {relative_path}: {marker}")
 
 
+def check_dynamic_source_boundaries(report: Report) -> None:
+    memory_path = ROOT / "docs/development/memory.md"
+    memory = memory_path.read_text(encoding="utf-8")
+    for heading in ("关键历史索引", "未完成", "下一步"):
+        if re.search(rf"^## {heading}\s*$", memory, re.MULTILINE):
+            report.error(
+                f"memory duplicates log or planning with forbidden section: {heading}"
+            )
+
+    for quarter_dir in quarter_directories(ROOT / "docs/planning"):
+        overview = quarter_dir / f"规划总览-{quarter_dir.name}.md"
+        if not overview.exists():
+            continue
+        content = overview.read_text(encoding="utf-8")
+        if re.search(r"^## (当前阶段|当前焦点|执行队列)\s*$", content, re.MULTILINE):
+            report.error(
+                "planning overview duplicates volatile requirement state: "
+                f"{overview.relative_to(ROOT)}"
+            )
+
+
 def check_local_links(report: Report, files: list[Path]) -> int:
     checked = 0
     for path in files:
@@ -143,12 +164,16 @@ def check_quarter_layout(report: Report) -> None:
         required = {
             f"规划总览-{quarter_dir.name}.md",
             f"需求管理-{quarter_dir.name}.md",
-            f"开发计划-{quarter_dir.name}.md",
         }
         present = {path.name for path in quarter_dir.glob("*.md")}
         for missing in sorted(required - present):
             missing_path = quarter_dir.relative_to(ROOT) / missing
             report.error(f"missing quarterly planning file: {missing_path}")
+        for redundant_plan in sorted(quarter_dir.glob("开发计划-*.md")):
+            report.error(
+                "quarterly development plan duplicates requirements, memory, and log: "
+                f"{redundant_plan.relative_to(ROOT)}"
+            )
 
     for quarter_dir in log_quarters:
         if quarter_dir.name not in log_index:
@@ -166,6 +191,12 @@ def check_quarter_layout(report: Report) -> None:
                 report.error(f"invalid dated development log name: {path.relative_to(ROOT)}")
             if path.name not in overview_content:
                 report.error(f"development overview does not reference: {path.relative_to(ROOT)}")
+            content = path.read_text(encoding="utf-8")
+            if re.search(r"^## (下一步|后续|下一环节)\s*$", content, re.MULTILINE):
+                report.error(
+                    "development log uses a live planning heading; label it as a historical snapshot: "
+                    f"{path.relative_to(ROOT)}"
+                )
 
     for quarter_dir in review_quarters:
         if quarter_dir.name not in review_index:
@@ -262,6 +293,7 @@ def main() -> int:
     check_required_paths(report)
     check_root_readme(report)
     check_temporal_context_model(report)
+    check_dynamic_source_boundaries(report)
     links_checked = check_local_links(report, files)
     check_quarter_layout(report)
     memory_lines, skill_lines = check_size_budgets(report)

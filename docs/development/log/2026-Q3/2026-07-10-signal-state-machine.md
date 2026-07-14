@@ -81,7 +81,7 @@ py main.py
   `SignalInstance.priority`。
 - Policy Gate 仍未实现；测试默认传入的 `DecisionTicket` 已经是准入后的票据。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 - 接入 FakeProvider 和 FakePreFilter，准备第一条 Candidate 到 Signal 的闭环。
 - 设计持久化层时补 `signal_transition`、`decision_ticket` 消费标记和 outbox。

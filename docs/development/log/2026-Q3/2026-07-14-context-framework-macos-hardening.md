@@ -54,7 +54,7 @@ make check
 - `main.py` 输出 `Hi, PyCharm`。
 - 项目 Skill 和全局镜像 validator 通过，SHA-256 一致。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 - 当前业务优先级仍是 REQ-0006，再推进 REQ-0005。
 - 进入 2026-Q4 前做一次 carryover 演练，验证跨季度规则。

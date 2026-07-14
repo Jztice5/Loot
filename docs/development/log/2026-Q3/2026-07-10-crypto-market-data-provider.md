@@ -66,7 +66,7 @@ okx.public_rest 2 BTC-USDT <close_price>
 - 第一次真实 smoke 被 OKX 返回 403，原因是默认 `urllib` 请求没有合适的
   User-Agent。已在 `_default_http_get` 添加只读客户端标识。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 1. 实现 `FakeCryptoPreFilter`。
 2. 从 `MarketSnapshot` 生成第一条 `CandidateEvent`。

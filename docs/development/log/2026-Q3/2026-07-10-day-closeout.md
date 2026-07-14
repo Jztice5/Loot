@@ -26,7 +26,7 @@ py -3.12 -m compileall src tests 通过
 OKX public REST smoke 通过
 ```
 
-## 下一环节
+## 当时遗留事项（历史快照）
 
 下一环节不直接进入 Agent 或 Alert，而是按需求管理文档推进：
 

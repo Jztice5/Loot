@@ -62,7 +62,7 @@ Position 仍与审核时一致。Ticket 必须绑定 expected version 和 contex
 - `rg -n ".{101,}" src tests`：无超长代码行。
 - 文档修改完成后执行本地 Markdown 链接扫描和 `git diff --check`。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 1. 实现 REQ-0009 并增加六类回归测试。
 2. 完成 REQ-0006 Golden Case。

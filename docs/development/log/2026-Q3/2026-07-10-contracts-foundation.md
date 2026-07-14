@@ -88,7 +88,7 @@ git diff --check
 - Signal State Machine 还没有实现，当前只验证 SignalEvent 必须表达状态变化。
 - Skill Manifest、SkillRun 和 Guard 输出仍缺契约。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 - 设计并实现 Signal State Machine 最小版本。
 - 增加合法迁移表和重复 DecisionTicket 消费语义。

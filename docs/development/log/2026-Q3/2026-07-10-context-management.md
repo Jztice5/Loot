@@ -58,7 +58,7 @@ flowchart TD
 - contracts 还没有独立设计文档，下一步编码前需要先收敛。
 - Signal State Machine 的统一引擎和市场 TransitionPolicy 职责还需要在实现前再次钉死。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 - 建立 `docs/architecture/contracts/` 或对应组件级契约设计。
 - 再创建 Python 项目骨架。

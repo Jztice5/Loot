@@ -47,7 +47,7 @@ make check
 - 项目 Skill 与全局镜像均通过 validator，SHA-256 为
   `a0f9796ac0846a2ca8bcc0b0fe97e3172d7199d75d21ca9daa77804173989c44`。
 
-## 后续
+## 当时遗留事项（历史快照）
 
 - REQ-0006 开始时，应从 Planned 转为 In Progress，并进入 memory 当前焦点。
 - REQ-0006 完成后，应转为 Done，把证据沉淀到 log/review，再从 memory 移除临时状态。
