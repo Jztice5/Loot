@@ -5,13 +5,23 @@
 1. `docs/README.md`
 2. `docs/development/memory.md`
 3. `docs/architecture/README.md`
-4. `docs/architecture/system/loot-system-architecture-v0.1.md`
-5. 与任务相关的 `docs/architecture/*/*.md` 或
+4. 与任务直接相关的 `docs/architecture/*/*.md` 或
    `docs/development/log/<yyyy-Qn>/*.md`
+
+只有涉及跨市场边界、系统分层、全局可靠性或不可变架构规则时，才需要完整阅读
+`docs/architecture/system/loot-system-architecture-v0.1.md`。其他任务以本文件中的硬约束
+和相关组件设计为准，避免无差别加载全部架构上下文。
 
 涉及项目上下文整理、季度归档或文档分层时，还必须阅读：
 
-6. `docs/skills/vibe-context-manager/SKILL.md`
+5. `docs/skills/vibe-context-manager/SKILL.md`
+
+## Context Source of Truth
+
+- 根 `README.md` 只保留稳定介绍和入口，不复制当前需求状态或下一步。
+- 当前阶段、验证基线、未完成事项和下一步以 `docs/development/memory.md` 为准。
+- 需求状态和推进顺序以当前季度 `docs/planning/<yyyy-Qn>/` 为准。
+- 历史验证必须保留日期和环境；不得把旧设备上的通过结果表述为当前机器已复验。
 
 ## Project Skill Source
 
@@ -90,6 +100,8 @@ Codex 实现功能前必须：
 - 形成阶段结论、风险判断或复核清单时，写入 `docs/reviews/<yyyy-Qn>/`。
 - 出现可重复操作命令时，写入 `docs/runbooks/`。
 - 未来 Codex 必须遵守的新硬约束，提升到本文件。
+- 完成收尾后在 macOS/Linux 运行 `make context-check`，Windows 运行
+  `.venv\Scripts\python.exe scripts\check_context.py`；检查失败时不能宣称完成。
 
 ## Quarterly Document Rules
 
@@ -115,3 +127,4 @@ Codex 实现功能前必须：
 - 至少覆盖成功、拒绝、重复投递、依赖失败和恢复路径。
 - 文档、迁移、测试和实现保持同步。
 - 上下文入口、memory、相关设计文档和 runbook 没有过期链接或明显矛盾。
+- 对应平台的 context check 通过，且当前验证记录包含实际运行环境和命令。

@@ -7,77 +7,89 @@
 - 文档移动、重命名或新增重要约束后。
 - 准备开始大规模实现前。
 
-## 检查命令
+## 自动检查
+
+macOS / Linux：
+
+```bash
+make context-check
+```
+
+Windows PowerShell：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\check_context.py
+```
+
+`scripts/check_context.py` 只使用 Python 标准库，检查：
+
+- 必需上下文入口是否存在。
+- 根 README 是否把当前事实委托给 memory/planning。
+- Markdown 本地链接目标是否存在。
+- planning、development log 和 reviews 的季度目录、文件命名及总览登记。
+- `memory.md` 和项目 Skill 是否超过加载预算。
+- 项目 Skill 与已安装的全局镜像是否一致。
+- Markdown、检查脚本、Makefile 和 pyproject 中的尾随空白与文件末尾换行。
+- `git diff --check` 和 `git diff --cached --check`。
+
+检查器输出 `context_summary` 和最终状态；出现 `ERROR` 时返回非零退出码。体量接近阈值或
+尚未安装全局 Skill 时输出 `WARN`，但不阻塞普通项目验证。
+
+## 人工补充检查
 
 ```bash
 git status --short --branch
+git log -1 --oneline --decorate
 rg --files docs
-git diff --check
-git diff --cached --check
 ```
+
+自动检查负责结构正确，人工检查负责判断内容是否真实。以下语义目前仍需人工确认：
+
+- memory 描述的阶段与当前代码是否一致。
+- 下一步与当前季度需求顺序是否一致。
+- architecture 是否混入临时实现流水账。
+- log 中重复出现的规则是否应晋升到 architecture 或 AGENTS。
+- review 中登记的风险是否已关闭或仍需跟踪。
 
 ## 检查项
 
-### 1. 入口健康
+### 1. 入口和单一事实源
 
-- `docs/README.md` 存在。
-- 能从 `docs/README.md` 两跳内找到 memory、architecture、planning、reviews 和 runbooks。
-- 根 `README.md` 指向 `docs/README.md`。
+- `docs/README.md` 两跳内可找到 memory、architecture、planning、reviews 和 runbooks。
+- 根 `README.md` 只保留稳定介绍和入口，不维护需求状态或下一步。
+- 当前状态只在 `docs/development/memory.md` 维护；需求状态只在当前季度 planning 维护。
 
-### 2. Memory 健康
+### 2. Memory
 
-- `docs/development/memory.md` 描述当前真实阶段。
-- 已验证命令和结果没有过期。
-- 下一步和当前计划一致。
-- 详细设计没有堆在 memory 里，而是链接到 architecture。
+- 描述当前真实阶段、活跃限制、未完成和下一步。
+- 详细设计链接到 architecture，不复制稳定规则全文。
+- 当前验证记录包含日期、OS、Python、Git 基线和实际命令。
+- 超过约 150 行或无法在两分钟内扫完时立即瘦身。
 
-### 3. Architecture 健康
+### 3. Architecture、Log、Review 和 Planning
 
-- `docs/architecture/README.md` 能说明每类设计归属。
-- 系统级设计只讲稳定边界和原则。
-- 组件级设计包含契约、状态机、幂等、失败处理和验收标准。
+- architecture 记录稳定边界、契约、状态机、失败处理和验收标准。
+- log 记录一次工作中的判断、证据、改动和验证。
+- review 记录阶段结论、风险、缺口和复核清单。
+- planning 使用当前季度的总览、需求管理和开发计划，不把业务状态复制到索引根目录。
 
-### 4. Log 健康
+### 4. Runbook 和 Project Skills
 
-- 重要判断有过程记录。
-- 过程记录说明为什么这样判断，不只是列出改动。
-- 已晋升为架构规则的内容不再只藏在 log 里。
-- 时间型日志位于正确的 `yyyy-Qn/`，季度总览文件名包含季度。
+- 可重复命令真实执行过，或明确标记为计划。
+- 新设备可以只根据 runbook 创建环境并重跑验证。
+- 项目 Skill 是权威副本，全局 `$CODEX_HOME/skills` 只是镜像。
+- 项目 Skill 通过 validator，且已安装镜像的哈希与项目副本一致。
 
-### 5. Review 健康
+### 5. AGENTS 和加载预算
 
-- 阶段结论、风险、缺口和复核清单在 `docs/reviews/` 可见。
-- 未定事项能追溯到 architecture open questions 或 review memo。
-- 评审位于对应季度目录，且季度评审总览文件名包含季度。
-
-### 5.1 Planning 健康
-
-- 当前季度具有 `规划总览-yyyy-Qn.md`、`需求管理-yyyy-Qn.md` 和
-  `开发计划-yyyy-Qn.md`。
-- `docs/planning/README.md` 只做跨季度导航，并指向当前季度。
-- memory 和项目文档入口指向同一个当前季度。
-
-### 6. Runbook 健康
-
-- 可重复命令放在 `docs/runbooks/`。
-- 命令真实执行过，或明确标记为计划。
-- 运行说明和当前项目阶段一致。
-
-### 6.1 Project Skills 健康
-
-- `docs/skills/README.md` 指向项目内权威 skill。
-- 项目 skill 通过 validator。
-- 本机需要使用该 skill 时，项目副本与 `$CODEX_HOME/skills` 镜像哈希一致。
-- 安装和同步操作能从 `docs/runbooks/sync-project-skills.md` 复现。
-
-### 7. AGENTS 健康
-
-- `AGENTS.md` 中要求阅读的路径真实存在。
-- 硬约束和当前架构文档一致。
-- 收尾归档动作覆盖 architecture、memory、log、review、runbook 和 AGENTS。
+- AGENTS 要求阅读的路径真实存在，硬约束与架构一致。
+- 默认只加载入口、memory、架构索引和任务相关设计。
+- 只有跨领域或系统级任务才加载完整系统架构，避免每次无差别读取大文档。
+- 收尾动作覆盖 architecture、memory、log、review、runbook、AGENTS 和自动检查。
 
 ## 处理规则
 
-- 如果入口、memory 或 AGENTS 任一项失败，先修上下文再继续开发。
-- 如果 architecture 和 implementation 不一致，同一变更中必须修正文档或实现。
-- 如果同一规则在多个 log 里重复出现，晋升到 architecture 或 AGENTS。
+- 入口、memory、AGENTS 或自动检查失败时，先修上下文再继续开发。
+- architecture 与 implementation 不一致时，在同一变更中修正文档或实现。
+- 同一规则在多个 log 里重复出现时，晋升到 architecture 或 AGENTS。
+- 当前机器无法复现历史验证时，记录实际阻塞原因，不继续展示为“当前已通过”。

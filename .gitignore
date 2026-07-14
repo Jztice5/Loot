@@ -1,4 +1,5 @@
 /.claude/
+.DS_Store
 
 # Python cache and build artifacts
 __pycache__/

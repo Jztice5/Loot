@@ -4,10 +4,9 @@ Loot the market before it loots you.
 
 Loot 是一个面向个人自选与手动持仓的多市场信号监控系统，目标是持续跟踪 Crypto、美股和 A 股中的关键价格结构、量价变化和信息事件，在值得关注的状态变化发生时提醒用户，减少反复看盘。
 
-当前项目处于 Phase 0 架构基础阶段，已建立 Python 项目骨架、第一批核心 contracts、
-Signal State Machine v0.1、Crypto 行情数据 Provider v0.1，并完成 Candidate 到 Signal
-授权链路和第二轮地基设计回归。现有 `main.py` 仍是 PyCharm 示例脚本，下一步先按
-REQ-0009 修复 Snapshot、闭合时间和状态机不变量，再固化 Crypto Golden Case。
+当前状态、验证基线和下一步只在
+[开发过程记忆](docs/development/memory.md) 与
+[规划跨季度索引](docs/planning/README.md) 中维护，避免入口摘要与真实进度漂移。
 
 ## 核心边界
 
@@ -34,33 +33,20 @@ REQ-0009 修复 Snapshot、闭合时间和状态机不变量，再固化 Crypto 
 - 自选与持仓信号监控闭环：[docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Crypto 行情数据 Provider：[docs/architecture/market-domains/crypto-market-data-provider-v0.1.md](docs/architecture/market-domains/crypto-market-data-provider-v0.1.md)
 
-## 本地运行
+## macOS 快速开始
 
-当前仅可运行示例脚本：
+需要 Python 3.12+。首次克隆或依赖变化后执行：
 
 ```bash
-py main.py
+make setup
+make check
 ```
 
-预期输出：
+运行当前示例入口：
 
-```text
-Hi, PyCharm
+```bash
+.venv/bin/python main.py
 ```
 
-更完整的运行说明见 [docs/runbooks/local-run.md](docs/runbooks/local-run.md)。
-
-当前契约测试：
-
-```powershell
-$env:PYTHONPATH='D:\my-projects\Loot\src'
-py -3.12 -m unittest discover -s tests -p 'test_*.py'
-```
-
-## 下一步
-
-1. 完成 REQ-0009，修复第二轮复核确认的地基不变量。
-2. 定义 Crypto Golden Case 输入和预期。
-3. 按 Golden Case 实现 FakeCryptoPreFilter。
-4. 串联 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine。
-5. 补持久化幂等与 Outbox，再接 Agent 和 Alert。
+macOS、Linux 和 Windows 的完整环境初始化与验证命令见
+[本地运行说明](docs/runbooks/local-run.md)。

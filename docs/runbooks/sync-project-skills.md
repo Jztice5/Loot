@@ -44,10 +44,11 @@ Get-FileHash -Algorithm SHA256 $source, $target
 ```powershell
 $validator = Join-Path $codexHome 'skills\.system\skill-creator\scripts\quick_validate.py'
 $env:PYTHONUTF8 = '1'
-py -3.12 $validator 'docs\skills\vibe-context-manager'
+& .\.venv\Scripts\python.exe $validator 'docs\skills\vibe-context-manager'
 ```
 
-`PYTHONUTF8=1` 用于避免 Windows 默认 GBK 解码 UTF-8 skill 时产生误报。
+先按 [本地运行说明](local-run.md) 初始化 `.venv`。`PYTHONUTF8=1` 用于避免 Windows
+默认 GBK 解码 UTF-8 skill 时产生误报。
 
 ## macOS / Linux
 
@@ -72,9 +73,12 @@ shasum -a 256 "$source_file" "$target_dir/SKILL.md"
 项目副本校验：
 
 ```bash
-python3 "$codex_home/skills/.system/skill-creator/scripts/quick_validate.py" \
+.venv/bin/python "$codex_home/skills/.system/skill-creator/scripts/quick_validate.py" \
   "docs/skills/vibe-context-manager"
 ```
+
+先执行 `make setup`，确保 `.venv` 包含 validator 所需的 PyYAML，避免依赖未说明的系统
+Python 全局包。
 
 ## 更新流程
 
