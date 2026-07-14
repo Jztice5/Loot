@@ -156,7 +156,9 @@ class SignalInstance(ContractModel):
         DecisionTicket -> Policy Gate -> Signal State Machine -> SignalInstance
 
     业务规则:
-        dedupe_key 不能为空；expires_at 不能早于 last_transition_at。
+        generation 从 1 开始；setup_key 和 dedupe_key 不能为空；初始 OBSERVING
+        必须没有 DecisionTicket，其他状态必须可追溯到最近一次 Ticket；expires_at
+        不能早于 last_transition_at。
     """
 
     id: UUID
@@ -169,15 +171,17 @@ class SignalInstance(ContractModel):
     state: SignalState
     priority: Priority
     actionability: Actionability
-    latest_decision_ticket_id: UUID
+    generation: int = Field(ge=1)
+    setup_key: str
+    latest_decision_ticket_id: UUID | None = None
     dedupe_key: str
     last_transition_at: datetime
     expires_at: datetime | None = None
     version: int = Field(ge=0)
 
-    @field_validator("dedupe_key")
+    @field_validator("setup_key", "dedupe_key")
     @classmethod
-    def _dedupe_key_is_present(cls, value: str) -> str:
+    def _identity_key_is_present(cls, value: str) -> str:
         return ensure_non_empty(value)
 
     @field_validator("last_transition_at", "expires_at")
@@ -186,7 +190,23 @@ class SignalInstance(ContractModel):
         return ensure_utc_datetime(value) if value is not None else None
 
     @model_validator(mode="after")
-    def _expires_after_transition(self) -> "SignalInstance":
+    def _signal_lifecycle_is_consistent(self) -> "SignalInstance":
+        # 决策注释: 只有状态机初始化的 OBSERVING 信号不需要市场决策授权。
+        if (
+            self.state == SignalState.OBSERVING
+            and self.latest_decision_ticket_id is not None
+        ):
+            raise ValueError(
+                "latest_decision_ticket_id must be empty in initial OBSERVING state"
+            )
+        if (
+            self.latest_decision_ticket_id is None
+            and self.state != SignalState.OBSERVING
+        ):
+            raise ValueError(
+                "latest_decision_ticket_id is required after initial OBSERVING state"
+            )
+
         # 决策注释: 信号不能在最后一次状态迁移之前过期。
         if self.expires_at is not None and self.expires_at < self.last_transition_at:
             raise ValueError("expires_at must not be earlier than last_transition_at")

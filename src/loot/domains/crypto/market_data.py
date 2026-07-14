@@ -433,20 +433,11 @@ def _build_snapshot(
     bars: list[MarketBar],
     as_of: datetime,
 ) -> MarketSnapshot:
-    latest_bar = bars[-1]
-    snapshot_key = (
-        f"{provider_name}:"
-        f"{instrument.instrument_id}:"
-        f"{timeframe}:"
-        f"{latest_bar.provider_event_id}"
-    )
-    return MarketSnapshot(
-        id=_stable_uuid(snapshot_key),
+    return MarketSnapshot.from_bars(
         market=instrument.market,
         instrument_id=instrument.instrument_id,
         timeframe=timeframe,
         source_provider=provider_name,
         as_of=as_of,
         bars=bars,
-        snapshot_key=snapshot_key,
     )

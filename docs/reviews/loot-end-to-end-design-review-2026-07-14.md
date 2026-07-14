@@ -35,8 +35,8 @@ MarketSnapshot
 -> Alert Policy
 ```
 
-授权链路设计方向成立，但进入 Golden Case 前先完成 REQ-0009 的地基不变量修正；
-REQ-0007 前还必须完成现有 DecisionTicket 契约迁移。
+授权链路设计方向成立。后续 `REQ-0009` 已完成地基不变量修正；进入 REQ-0007 前还
+必须完成现有 DecisionTicket 契约迁移。
 
 ## 3. 已解决问题
 
@@ -113,5 +113,5 @@ REQ-0007 只实现最小必要 Guard，不提前铺完整 Agent Runtime。
 
 ## 6. 一句话结论
 
-设计已经从“组件都存在”收敛为“授权链路可证明”；第二轮复核后，下一步先修复
-REQ-0009，再写 Golden Case 和 PreFilter，暂不接 Agent、Alert 或更多行情类型。
+设计已经从“组件都存在”收敛为“授权链路可证明”；`REQ-0009` 已完成，下一步写
+Golden Case 和 PreFilter，暂不接 Agent、Alert 或更多行情类型。

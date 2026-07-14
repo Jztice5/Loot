@@ -79,18 +79,19 @@ V0.1 严格采用闭环设计文档中的最小迁移表：
 当前 `SignalStateMachine.apply(current_signal, decision_ticket)` 执行步骤：
 
 1. 以 `decision_ticket.id` 查询内存幂等账本。
-2. 命中时返回首次 `SignalTransitionResult`，标记 `duplicate=True`。
+2. 命中时核对完整 canonical payload 指纹；一致则返回首次结果，不一致则拒绝。
 3. 校验 `market`、`instrument_id`、`timeframe` 与当前 Signal 一致。
-4. 如果目标状态等于当前状态，返回 no-op 结果，不生成 `SignalEvent`。
-5. 校验合法迁移表。
-6. 生成新的 `SignalInstance` 投影：
+4. 将 occurred_at 归一化为 UTC，并拒绝倒退或晚于当前 expires_at 的迁移。
+5. 如果目标状态等于当前状态，返回 no-op 结果，不生成 `SignalEvent`。
+6. 校验合法迁移表。
+7. 使用完整 Pydantic 模型校验生成新的 `SignalInstance` 投影：
    - `state = decision_ticket.suggested_transition`
    - `actionability = decision_ticket.actionability`
    - `latest_decision_ticket_id = decision_ticket.id`
    - `last_transition_at = occurred_at`
    - `version = current_signal.version + 1`
-7. 生成 `SignalEvent`，包含 from/to state、priority、actionability、position impact。
-8. 将结果写入内存账本。
+8. 生成 `SignalEvent`，包含 from/to state、priority、actionability、position impact。
+9. 将 Ticket payload 指纹和首次结果写入内存账本。
 
 当前代码字段仍名为 `suggested_transition`。按 2026-07-14 的授权链路回归，后续契约
 迁移后应改为读取 `authorized_transition`，并校验 Ticket 的有效期、
@@ -139,6 +140,8 @@ decision_ticket.id
 | `SignalTransitionMismatchError` | DecisionTicket 与 Signal 的市场、标的或周期不一致 |
 | `InvalidSignalTransitionError` | 请求迁移不在 V0.1 合法迁移表 |
 | `DuplicateDecisionConflictError` | 同一 DecisionTicket ID 被用于不一致迁移 |
+| `ExpiredSignalTransitionError` | occurred_at 晚于当前 Signal expires_at |
+| `SignalTransitionTimeError` | occurred_at 早于当前 Signal last_transition_at |
 
 ## 7. 测试覆盖
 
@@ -150,13 +153,16 @@ decision_ticket.id
 - 相同 Ticket ID 但 payload 不同被拒绝。
 - 同状态 `DecisionTicket` 不生成事件。
 - DecisionTicket 与 Signal 身份不一致时拒绝。
-- 迁移后 SignalInstance 仍满足 expires_at 和 UTC 不变量。
+- 迁移时间归一化为 UTC，倒退时间和过期迁移被拒绝。
+- 迁移后通过完整模型校验重建 SignalInstance。
 - 初始 Signal 不需要伪造 latest_decision_ticket_id。
-- 终态后新 setup 生成下一代 Signal，旧实例保持不可变历史。
+- 非 OBSERVING Signal 缺少 latest_decision_ticket_id 时被契约拒绝。
 
 ## 8. 后续扩展
 
 - 接入持久化仓库和乐观锁。
+- 在 REQ-0007 实现幂等 initialize/next-generation 入口；REQ-0009 仅已固定契约字段
+  和初始空 Ticket 语义。
 - 引入市场专属 `TransitionPolicy`，但共享状态机仍只负责执行迁移。
 - 先完成 `DecisionProposal -> PolicyEvaluation -> DecisionTicket` 契约迁移，状态机
   不再接收任何 Policy 前对象。

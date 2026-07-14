@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from loot.contracts import (
@@ -17,8 +17,11 @@ from loot.contracts import (
     Timeframe,
 )
 from loot.signals import (
+    DuplicateDecisionConflictError,
+    ExpiredSignalTransitionError,
     InvalidSignalTransitionError,
     SignalStateMachine,
+    SignalTransitionTimeError,
     SignalTransitionMismatchError,
 )
 
@@ -34,6 +37,8 @@ def sample_signal(
     state: SignalState = SignalState.OBSERVING,
     market: Market = Market.CRYPTO,
     instrument_id: UUID | None = None,
+    last_transition_at: datetime | None = None,
+    expires_at: datetime | None = None,
 ) -> SignalInstance:
     """Build a SignalInstance with stable defaults."""
 
@@ -48,10 +53,15 @@ def sample_signal(
         state=state,
         priority=Priority.HIGH,
         actionability=Actionability.WATCH_ONLY,
-        latest_decision_ticket_id=uuid4(),
+        generation=1,
+        setup_key=f"setup:{instrument_uuid}:h1:structure:1",
+        latest_decision_ticket_id=(
+            None if state == SignalState.OBSERVING else uuid4()
+        ),
         dedupe_key=f"signal:{instrument_uuid}:h1:structure",
-        last_transition_at=aware_now(),
-        version=3,
+        last_transition_at=last_transition_at or aware_now(),
+        expires_at=expires_at,
+        version=0 if state == SignalState.OBSERVING else 3,
     )
 
 
@@ -141,6 +151,68 @@ class SignalStateMachineTest(unittest.TestCase):
         self.assertEqual(duplicate.event.event_id, event_id)
         self.assertEqual(duplicate.signal.version, first.signal.version)
         self.assertEqual(state_machine.applied_decision_count(), 1)
+
+    def test_duplicate_ticket_with_changed_payload_is_rejected(self) -> None:
+        state_machine = SignalStateMachine()
+        signal = sample_signal()
+        ticket = sample_ticket(signal, target_state=SignalState.ARMED)
+        first = state_machine.apply(signal, ticket, occurred_at=aware_now())
+        changed_ticket = DecisionTicket.model_validate(
+            {
+                **ticket.model_dump(),
+                "position_impact": "DIFFERENT_IMPACT",
+            }
+        )
+
+        with self.assertRaises(DuplicateDecisionConflictError):
+            state_machine.apply(
+                first.signal,
+                changed_ticket,
+                occurred_at=aware_now() + timedelta(hours=1),
+            )
+
+    def test_transition_after_signal_expiry_is_rejected(self) -> None:
+        state_machine = SignalStateMachine()
+        signal = sample_signal(
+            last_transition_at=aware_now() - timedelta(hours=1),
+            expires_at=aware_now() - timedelta(minutes=30),
+        )
+        ticket = sample_ticket(signal, target_state=SignalState.ARMED)
+
+        with self.assertRaises(ExpiredSignalTransitionError):
+            state_machine.apply(signal, ticket, occurred_at=aware_now())
+
+        self.assertEqual(state_machine.applied_decision_count(), 0)
+
+    def test_transition_time_is_normalized_to_utc(self) -> None:
+        state_machine = SignalStateMachine()
+        signal = sample_signal()
+        ticket = sample_ticket(signal, target_state=SignalState.ARMED)
+        china_time = datetime(
+            2026,
+            7,
+            10,
+            17,
+            0,
+            tzinfo=timezone(timedelta(hours=8)),
+        )
+
+        result = state_machine.apply(signal, ticket, occurred_at=china_time)
+
+        self.assertEqual(result.signal.last_transition_at, aware_now())
+        self.assertEqual(result.event.occurred_at, aware_now())
+
+    def test_transition_time_cannot_move_backwards(self) -> None:
+        state_machine = SignalStateMachine()
+        signal = sample_signal()
+        ticket = sample_ticket(signal, target_state=SignalState.ARMED)
+
+        with self.assertRaises(SignalTransitionTimeError):
+            state_machine.apply(
+                signal,
+                ticket,
+                occurred_at=aware_now() - timedelta(seconds=1),
+            )
 
     def test_same_state_ticket_is_noop_without_event(self) -> None:
         state_machine = SignalStateMachine()

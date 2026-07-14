@@ -7,7 +7,7 @@
 
 - 项目定位：面向个人自选与手动持仓的多市场信号监控系统。
 - 当前阶段：Phase 0 架构基础阶段，已建立核心 contracts、Signal State Machine v0.1、
-  Crypto 行情 Provider v0.1，并完成授权链路与第二轮地基设计回归。
+  Crypto 行情 Provider v0.1，并完成授权链路设计回归和 REQ-0009 地基不变量修正。
 - 当前代码入口：`main.py` 仍是 PyCharm 示例脚本；核心契约代码在 `src/loot/contracts`，状态机代码在 `src/loot/signals`，Crypto 行情代码在 `src/loot/domains/crypto`。
 - 当前文档入口：`docs/README.md`。
 - 当前宏观设计：`docs/architecture/system/loot-system-architecture-v0.1.md`。
@@ -64,6 +64,8 @@ WatchItem / TradingPlan / PositionEvent
 - 已创建全局 Codex skill `vibe-context-manager`，可复用到其他长期 vibe coding 项目。
 - 第一批 contracts 使用 Pydantic v2 不可变模型，禁止额外字段，并要求跨模块时间为 timezone-aware UTC。
 - Signal State Machine v0.1 使用固定合法迁移表和内存幂等账本；同一 `DecisionTicket` 重复消费不会重复生成 `SignalEvent`。
+- 内存幂等账本同时保存完整 Ticket payload 指纹；同 ID 不同内容会抛出冲突。
+- Signal 状态迁移先归一化 UTC 时间并完整重建 Pydantic 投影，拒绝过期或倒退迁移。
 - 当前 `src/loot/contracts/signals.py` 仍把 Policy 前建议实现为 `DecisionTicket`；
   REQ-0007 前必须迁移为 `DecisionProposal`，再增加 Policy 后的新 Ticket。
 - Crypto 行情数据 Provider v0.1 已接入：`FakeCryptoProvider` 用于可复现测试，`OkxRestCryptoProvider` 只读访问 OKX public REST K 线。
@@ -83,6 +85,7 @@ WatchItem / TradingPlan / PositionEvent
 | 2026-07-10 | Crypto 行情 Provider v0.1 | 定义 MarketBar/MarketSnapshot，接入 FakeCryptoProvider 和 OKX public REST K 线 | [过程记录](log/2026-07-10-crypto-market-data-provider.md) |
 | 2026-07-14 | 决策链路设计回归 | 拆分 Proposal、PolicyEvaluation 和 Ticket，固定事务、幂等、失败与追踪边界 | [过程记录](log/2026-07-14-decision-flow-design-regression.md) |
 | 2026-07-14 | 第二轮地基约束 | 用现有代码复现四类风险，补齐 Snapshot、Policy、Ticket 和 Signal 生命周期约束 | [第二轮复核](../reviews/loot-foundation-second-review-2026-07-14.md) |
+| 2026-07-14 | REQ-0009 地基修正 | 落地 Snapshot 内容寻址、闭合时间、Signal 初始化和 Ticket 指纹回归 | [过程记录](log/2026-07-14-req-0009-foundation-invariants.md) |
 
 ## 已验证
 
@@ -90,18 +93,19 @@ WatchItem / TradingPlan / PositionEvent
 - 当前文档已按系统级和闭环级分层。
 - `git diff --check` 已用于格式检查。
 - `py -3.12 -m compileall src tests`：通过。
-- `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：30 tests OK。
+- `$env:PYTHONPATH='D:\my-projects\Loot\src'; py -3.12 -m unittest discover -s tests -p 'test_*.py'`：41 tests OK。
 - OKX public REST smoke：通过，默认返回 2 根已收盘 BTC-USDT 1H K 线。
 - 下一环节需求规划已沉淀到 `docs/planning/需求管理.md`。
 - 2026-07-14 Markdown 本地链接扫描：通过，无失效链接。
 - 2026-07-14 `git diff --check`：通过，仅有仓库行尾转换提示。
 - 2026-07-14 第二轮复核：30 tests OK，`compileall` 通过；额外复现 Snapshot identity
   冲突、非法 Signal 投影、提前闭合 K 线和 Ticket payload 冲突漏检。
+- 2026-07-14 REQ-0009 回归：上述四类问题均已修复；新增不同窗口、历史内容、闭合
+  时间、初始 Signal、UTC/过期投影和 payload 冲突测试，`compileall` 与行长检查通过。
 
 ## 未完成
 
 - Persistence 和 migrations。
-- REQ-0009：Snapshot、闭合时间、Signal 初始化/投影和 Ticket 冲突回归修正。
 - FakeCryptoPreFilter 和第一批 Golden Case。
 - DecisionProposal、PolicyEvaluation、Policy 后 DecisionTicket 的契约迁移。
 - Skill Manifest、SkillRun 和 Guard 输出契约。
@@ -110,11 +114,10 @@ WatchItem / TradingPlan / PositionEvent
 
 优先级建议：
 
-1. 按 `REQ-0009` 修复第二轮复核确认的地基不变量并补回归测试。
-2. 按 `REQ-0006` 定义 Crypto Golden Case 输入和预期。
-3. 再按 `REQ-0005` 实现 Crypto Candidate PreFilter。
-4. 按 `REQ-0007` 串联 Proposal、PolicyEvaluation、Ticket 和 Signal State Machine。
-5. 按 `REQ-0008` 设计持久化 DecisionTicket 消费、SignalTransition 和 outbox。
-6. 再开始 Skill Runtime 和 Agent 接入。
+1. 按 `REQ-0006` 定义 Crypto Golden Case 输入和预期。
+2. 再按 `REQ-0005` 实现 Crypto Candidate PreFilter。
+3. 按 `REQ-0007` 串联 Proposal、PolicyEvaluation、Ticket 和 Signal State Machine。
+4. 按 `REQ-0008` 设计持久化 DecisionTicket 消费、SignalTransition 和 outbox。
+5. 再开始 Skill Runtime 和 Agent 接入。
 
 日常计划记录放在 [../planning/开发计划.md](../planning/开发计划.md)。

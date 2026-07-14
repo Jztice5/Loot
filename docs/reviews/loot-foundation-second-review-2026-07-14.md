@@ -14,8 +14,9 @@
 继续向下检查后，发现 Snapshot identity、Policy 重评、Ticket 新鲜度、Signal 初始化和
 投影校验仍有缺口。
 
-本轮已经把稳定规则补进 architecture 和 AGENTS。当前可以认为“设计约束已定稿”，
-但不能认为“现有代码已满足约束”。进入 Golden Case 前先完成 `REQ-0009`。
+本轮先把稳定规则补进 architecture 和 AGENTS，随后已通过 `REQ-0009` 完成代码修正。
+Snapshot、闭合时间、Signal 初始化契约、投影重校验和 Ticket 指纹门槛已经满足，可以
+进入 Golden Case；Policy 授权与持久化约束仍分别留在 `REQ-0007`、`REQ-0008`。
 
 ## 3. 已复现问题
 
@@ -82,28 +83,32 @@ stored_position_impact=FIRST
 - [Crypto 行情 Provider](../architecture/market-domains/crypto-market-data-provider-v0.1.md)
 - [Signal State Machine](../architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 
-## 5. 当前实现阻塞项
+## 5. 实现收口
 
-- `MarketSnapshot` 尚无 snapshot_content_hash。
-- `_build_snapshot` 仍只使用 latest provider_event_id。
-- MarketBar 尚未校验闭合时间真实性。
-- SignalInstance.latest_decision_ticket_id 仍不可为空，且尚无 generation/setup_key。
-- 状态机仍使用不校验更新的 model_copy。
-- 重复 Ticket 尚无 payload fingerprint。
-- DecisionProposal、可重评 PolicyEvaluation 和新 DecisionTicket 尚未实现。
+`REQ-0009` 已完成：
 
-这些问题统一进入 `REQ-0009`、`REQ-0007` 和 `REQ-0008`，不散落成临时补丁。
+- `MarketSnapshot` 使用完整 canonical 窗口计算 snapshot_content_hash，并校验 key 和 ID。
+- MarketBar 和 MarketSnapshot 分别校验闭合接收时间与 as_of 真实性。
+- SignalInstance 支持初始空 Ticket，并增加 generation/setup_key。
+- 状态机不再使用跳过 validator 的 `model_copy(update=...)` 生成投影。
+- 重复 Ticket 使用完整 payload fingerprint 检测冲突。
+
+仍未完成且不属于 `REQ-0009`：
+
+- DecisionProposal、可重评 PolicyEvaluation 和 Policy 后新 DecisionTicket：`REQ-0007`。
+- initialize/next-generation 状态机入口和持久化单活跃代约束：`REQ-0007/REQ-0008`。
+- PostgreSQL 授权链验证、Inbox/Outbox 和跨进程幂等：`REQ-0008`。
 
 ## 6. 复核门槛
 
 进入 Golden Case 前：
 
-- `REQ-0009` 的六类回归测试全部通过。
-- 不同输入窗口具有不同 Snapshot identity。
-- 提前闭合 K 线无法进入快照。
-- 状态机无法返回违反 SignalInstance 不变量的投影。
-- 初始 Signal 不再伪造 DecisionTicket。
-- 修改重复 Ticket payload 会触发冲突。
+- [x] `REQ-0009` 的六类回归测试全部通过。
+- [x] 不同输入窗口具有不同 Snapshot identity。
+- [x] 提前闭合 K 线无法进入快照。
+- [x] 状态机无法返回违反 SignalInstance 不变量的投影。
+- [x] 初始 Signal 不再伪造 DecisionTicket。
+- [x] 修改重复 Ticket payload 会触发冲突。
 
 进入授权链路实现前：
 
@@ -113,5 +118,5 @@ stored_position_impact=FIRST
 
 ## 7. 一句话结论
 
-先修复已经证实的地基不变量，再用 Golden Case 定义市场规则；当前不应直接推进
-PreFilter、Agent 或 Alert。
+已证实的地基不变量已修复；下一步用 Golden Case 定义市场规则，再实现 PreFilter，
+仍不应直接推进 Agent 或 Alert。

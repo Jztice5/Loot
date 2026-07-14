@@ -160,7 +160,7 @@ Ticket 写入后不可修改，过期 Ticket 不能改变 Signal。同一 Propos
 签发一张 Ticket。状态机必须从事实源校验 APPROVED PolicyEvaluation、proposal_digest
 和上下文版本，不能仅信任调用方构造的 Ticket。
 
-`SignalInstance` 初始化时 `latest_decision_ticket_id` 允许为 null，并携带从 1 开始的
+`SignalInstance` 初始化时 `latest_decision_ticket_id` 必须为 null，并携带从 1 开始的
 generation 和稳定 setup_key。终态实例不可重置；新市场结构创建下一代实例。任何投影
 更新都必须重新运行完整契约校验，不能通过不校验的局部复制形成事实状态。
 

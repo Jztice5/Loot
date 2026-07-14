@@ -18,13 +18,17 @@
 
 业务规则:
     - 只允许 V0.1 迁移表内的状态变化。
-    - 同一个 DecisionTicket 重复消费必须返回首次结果，不产生新事件。
+    - 同一个 DecisionTicket ID 只有完整 payload 指纹一致时才返回首次结果。
     - suggested_transition 等于当前状态时不产生 SignalEvent。
     - DecisionTicket 的市场、标的和周期必须与 SignalInstance 一致。
+    - 迁移时间必须单向推进，且不能晚于 Signal 当前有效期。
+    - Signal 投影必须通过完整 Pydantic 校验重建。
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -36,6 +40,7 @@ from loot.contracts import (
     SignalInstance,
     SignalState,
 )
+from loot.contracts.base import ensure_utc_datetime
 
 
 class SignalStateMachineError(ValueError):
@@ -59,6 +64,14 @@ class DuplicateDecisionConflictError(SignalStateMachineError):
     """相同 DecisionTicket ID 被用于不一致的信号迁移。"""
 
 
+class ExpiredSignalTransitionError(SignalStateMachineError):
+    """迁移时间已经晚于当前 Signal 的有效期。"""
+
+
+class SignalTransitionTimeError(SignalStateMachineError):
+    """迁移时间早于 Signal 已记录的最后迁移时间。"""
+
+
 @dataclass(frozen=True, slots=True)
 class SignalTransitionResult:
     """Signal 状态机迁移结果。
@@ -75,6 +88,15 @@ class SignalTransitionResult:
     decision_ticket_id: UUID
     changed: bool
     duplicate: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _AppliedDecisionRecord:
+    """内存幂等账本中的首次 Ticket 指纹和迁移结果。"""
+
+    signal_id: UUID
+    ticket_fingerprint: str
+    result: SignalTransitionResult
 
 
 class SignalStateMachine:
@@ -96,7 +118,8 @@ class SignalStateMachine:
 
     业务规则:
         - 内存幂等账本只用于 Phase 0，本类不承担持久化职责。
-        - 重复 DecisionTicket 返回首次 SignalTransitionResult，不再次增加 version。
+        - ID 和完整 payload 均相同的重复 Ticket 返回首次结果，不再次增加 version。
+        - 相同 Ticket ID 对应不同 payload 时按冲突拒绝，不能解释为正常重试。
         - 非法迁移抛出 InvalidSignalTransitionError。
     """
 
@@ -115,7 +138,7 @@ class SignalStateMachine:
     )
 
     def __init__(self) -> None:
-        self._applied_results: dict[UUID, SignalTransitionResult] = {}
+        self._applied_results: dict[UUID, _AppliedDecisionRecord] = {}
 
     @classmethod
     def can_transition(cls, from_state: SignalState, to_state: SignalState) -> bool:
@@ -147,7 +170,8 @@ class SignalStateMachine:
             -> build_signal_projection -> build_signal_event
 
         幂等逻辑:
-            使用 decision_ticket.id 作为内存去重键。重复消费返回首次结果，不生成新事件。
+            使用 decision_ticket.id 查找内存账本，并核对完整 canonical payload 指纹；
+            完全一致的重复消费返回首次结果，不生成新事件。
 
         Args:
             current_signal: 当前 Signal 投影。
@@ -162,18 +186,23 @@ class SignalStateMachine:
             SignalTransitionMismatchError: 决策票据与 Signal 身份不一致。
             InvalidSignalTransitionError: 请求的状态迁移不合法。
             DuplicateDecisionConflictError: 相同票据 ID 被用于不一致迁移。
+            ExpiredSignalTransitionError: 迁移时间晚于当前 Signal 有效期。
+            SignalTransitionTimeError: 迁移时间早于已记录的最后迁移时间。
         """
 
-        duplicate = self._applied_results.get(decision_ticket.id)
-        if duplicate is not None:
+        ticket_fingerprint = self._decision_ticket_fingerprint(decision_ticket)
+        duplicate_record = self._applied_results.get(decision_ticket.id)
+        if duplicate_record is not None:
             self._ensure_duplicate_is_consistent(
-                duplicate,
+                duplicate_record,
                 current_signal,
-                decision_ticket,
+                ticket_fingerprint,
             )
-            return replace(duplicate, duplicate=True)
+            return replace(duplicate_record.result, duplicate=True)
 
         self._ensure_ticket_matches_signal(current_signal, decision_ticket)
+        transition_time = ensure_utc_datetime(occurred_at or datetime.now(UTC))
+        self._ensure_transition_time_is_valid(current_signal, transition_time)
 
         # 决策: 相同状态不是事实变化，不能发布 SignalEvent 触发重复提醒。
         if current_signal.state == decision_ticket.suggested_transition:
@@ -183,7 +212,12 @@ class SignalStateMachine:
                 decision_ticket_id=decision_ticket.id,
                 changed=False,
             )
-            self._applied_results[decision_ticket.id] = result
+            self._remember_result(
+                current_signal,
+                decision_ticket,
+                ticket_fingerprint,
+                result,
+            )
             return result
 
         if not self.can_transition(
@@ -195,9 +229,9 @@ class SignalStateMachine:
                 decision_ticket.suggested_transition,
             )
 
-        transition_time = occurred_at or datetime.now(UTC)
-        updated_signal = current_signal.model_copy(
-            update={
+        updated_payload = current_signal.model_dump()
+        updated_payload.update(
+            {
                 "state": decision_ticket.suggested_transition,
                 "actionability": decision_ticket.actionability,
                 "latest_decision_ticket_id": decision_ticket.id,
@@ -205,6 +239,8 @@ class SignalStateMachine:
                 "version": current_signal.version + 1,
             }
         )
+        # 决策: 完整重建投影，确保跨字段 validator 在每次状态迁移后重新执行。
+        updated_signal = SignalInstance.model_validate(updated_payload)
         event = self._build_signal_event(
             current_signal,
             updated_signal,
@@ -218,7 +254,12 @@ class SignalStateMachine:
             decision_ticket_id=decision_ticket.id,
             changed=True,
         )
-        self._applied_results[decision_ticket.id] = result
+        self._remember_result(
+            current_signal,
+            decision_ticket,
+            ticket_fingerprint,
+            result,
+        )
         return result
 
     def applied_decision_count(self) -> int:
@@ -243,22 +284,56 @@ class SignalStateMachine:
 
     @staticmethod
     def _ensure_duplicate_is_consistent(
-        existing: SignalTransitionResult,
+        existing: _AppliedDecisionRecord,
         current_signal: SignalInstance,
-        decision_ticket: DecisionTicket,
+        ticket_fingerprint: str,
     ) -> None:
-        if existing.signal.id != current_signal.id:
+        if existing.signal_id != current_signal.id:
             raise DuplicateDecisionConflictError(
                 "decision ticket was already applied to a different signal"
             )
 
-        expected_state = (
-            existing.event.to_state if existing.event is not None else existing.signal.state
-        )
-        if expected_state != decision_ticket.suggested_transition:
+        if existing.ticket_fingerprint != ticket_fingerprint:
             raise DuplicateDecisionConflictError(
-                "decision ticket was already applied with a different target state"
+                "decision ticket payload differs from the first consumed payload"
             )
+
+    @staticmethod
+    def _ensure_transition_time_is_valid(
+        signal: SignalInstance,
+        transition_time: datetime,
+    ) -> None:
+        if transition_time < signal.last_transition_at:
+            raise SignalTransitionTimeError(
+                "occurred_at must not be earlier than signal last_transition_at"
+            )
+        if signal.expires_at is not None and transition_time > signal.expires_at:
+            raise ExpiredSignalTransitionError(
+                "signal expired before the requested transition time"
+            )
+
+    @staticmethod
+    def _decision_ticket_fingerprint(decision_ticket: DecisionTicket) -> str:
+        canonical_payload = json.dumps(
+            decision_ticket.model_dump(mode="json"),
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+    def _remember_result(
+        self,
+        current_signal: SignalInstance,
+        decision_ticket: DecisionTicket,
+        ticket_fingerprint: str,
+        result: SignalTransitionResult,
+    ) -> None:
+        self._applied_results[decision_ticket.id] = _AppliedDecisionRecord(
+            signal_id=current_signal.id,
+            ticket_fingerprint=ticket_fingerprint,
+            result=result,
+        )
 
     @staticmethod
     def _build_signal_event(

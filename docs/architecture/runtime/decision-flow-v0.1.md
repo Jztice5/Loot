@@ -455,7 +455,7 @@ src/loot/notifications/          Alert Policy 和 Notifier
 
 ## 13. 实施顺序
 
-1. 先修复 Snapshot 身份、闭合时间和状态机投影校验等已复现地基问题。
+1. 已完成：修复 Snapshot 身份、闭合时间和状态机投影校验等已复现地基问题。
 2. 固化 Crypto Golden Case 输入和预期。
 3. 实现只读取 `latest_closed_bar` 的 Crypto PreFilter。
 4. 实现 OBSERVING SignalInstance 的幂等初始化和 generation 规则。

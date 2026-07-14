@@ -13,6 +13,7 @@
 | 2026-07-10 | 日终收尾与需求规划 | [2026-07-10-day-closeout.md](2026-07-10-day-closeout.md) | `closeout`、`需求管理`、`REQ-0005`、`REQ-0006`、`REQ-0007` |
 | 2026-07-14 | 决策链路设计回归 | [2026-07-14-decision-flow-design-regression.md](2026-07-14-decision-flow-design-regression.md) | `DecisionProposal`、`PolicyEvaluation`、`DecisionTicket`、`Golden Case` |
 | 2026-07-14 | 第二轮地基约束收敛 | [2026-07-14-foundation-constraints.md](2026-07-14-foundation-constraints.md) | `snapshot_content_hash`、`DEFERRED`、`context_digest`、`generation` |
+| 2026-07-14 | REQ-0009 地基不变量修正 | [2026-07-14-req-0009-foundation-invariants.md](2026-07-14-req-0009-foundation-invariants.md) | `canonical hash`、`closed_at`、`full validation`、`payload fingerprint` |
 
 新过程记录可从 [TEMPLATE.md](TEMPLATE.md) 复制结构。
 

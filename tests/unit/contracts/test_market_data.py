@@ -31,6 +31,7 @@ def sample_bar(
     opened_at: datetime | None = None,
     provider_event_id: str = "fake:BTC-USDT:h1:1",
     is_closed: bool = True,
+    received_at: datetime | None = None,
 ) -> MarketBar:
     """Build a valid MarketBar with stable defaults."""
 
@@ -53,7 +54,7 @@ def sample_bar(
         volume=Decimal("12"),
         quote_volume=Decimal("1260"),
         is_closed=is_closed,
-        received_at=bar_opened_at + timedelta(hours=1),
+        received_at=received_at or bar_opened_at + timedelta(hours=1),
     )
 
 
@@ -72,6 +73,16 @@ class MarketDataContractTest(unittest.TestCase):
                 high_price=Decimal("99"),
             )
 
+    def test_market_bar_rejects_closed_state_before_real_close_time(self) -> None:
+        opened_at = aware_now()
+
+        with RaisesValidationError("closed bar received_at must not be earlier"):
+            sample_bar(
+                opened_at=opened_at,
+                is_closed=True,
+                received_at=opened_at + timedelta(minutes=59),
+            )
+
     def test_market_snapshot_requires_ordered_unique_bars(self) -> None:
         instrument_id = uuid4()
         first = sample_bar(
@@ -85,15 +96,13 @@ class MarketDataContractTest(unittest.TestCase):
             provider_event_id="fake:2",
         )
 
-        snapshot = MarketSnapshot(
-            id=uuid4(),
+        snapshot = MarketSnapshot.from_bars(
             market=Market.CRYPTO,
             instrument_id=instrument_id,
             timeframe=Timeframe.H1,
             source_provider="fake.crypto",
             as_of=aware_now() + timedelta(hours=2),
             bars=[first, second],
-            snapshot_key="snapshot:1",
         )
 
         self.assertEqual(snapshot.bars[0].provider_event_id, "fake:1")
@@ -116,15 +125,13 @@ class MarketDataContractTest(unittest.TestCase):
             is_closed=False,
         )
 
-        snapshot = MarketSnapshot(
-            id=uuid4(),
+        snapshot = MarketSnapshot.from_bars(
             market=Market.CRYPTO,
             instrument_id=instrument_id,
             timeframe=Timeframe.H1,
             source_provider="fake.crypto",
             as_of=aware_now() + timedelta(hours=1, minutes=30),
             bars=[closed_bar, unclosed_bar],
-            snapshot_key="snapshot:with-unclosed",
         )
 
         self.assertEqual(snapshot.latest_bar, unclosed_bar)
@@ -145,15 +152,76 @@ class MarketDataContractTest(unittest.TestCase):
         )
 
         with RaisesValidationError("provider_event_id must be unique"):
-            MarketSnapshot(
-                id=uuid4(),
+            MarketSnapshot.from_bars(
                 market=Market.CRYPTO,
                 instrument_id=instrument_id,
                 timeframe=Timeframe.H1,
                 source_provider="fake.crypto",
                 as_of=aware_now() + timedelta(hours=2),
                 bars=[first, second],
-                snapshot_key="snapshot:duplicate",
+            )
+
+    def test_market_snapshot_rejects_as_of_before_closed_bar_end(self) -> None:
+        bar = sample_bar(opened_at=aware_now())
+
+        with RaisesValidationError("as_of must not be earlier than any closed bar"):
+            MarketSnapshot.from_bars(
+                market=bar.market,
+                instrument_id=bar.instrument_id,
+                timeframe=bar.timeframe,
+                source_provider=bar.provider,
+                as_of=bar.closed_at - timedelta(minutes=1),
+                bars=[bar],
+            )
+
+    def test_snapshot_content_hash_changes_with_bar_facts(self) -> None:
+        bar = sample_bar(opened_at=aware_now())
+        changed_volume = MarketBar.model_validate(
+            {
+                **bar.model_dump(),
+                "volume": Decimal("13"),
+            }
+        )
+        changed_closed_state = MarketBar.model_validate(
+            {
+                **bar.model_dump(),
+                "is_closed": False,
+            }
+        )
+
+        snapshots = [
+            MarketSnapshot.from_bars(
+                market=bar.market,
+                instrument_id=bar.instrument_id,
+                timeframe=bar.timeframe,
+                source_provider=bar.provider,
+                as_of=bar.closed_at,
+                bars=[candidate],
+            )
+            for candidate in (bar, changed_volume, changed_closed_state)
+        ]
+
+        self.assertEqual(len({item.snapshot_content_hash for item in snapshots}), 3)
+        self.assertEqual(len({item.snapshot_key for item in snapshots}), 3)
+        self.assertEqual(len({item.id for item in snapshots}), 3)
+
+    def test_market_snapshot_rejects_mismatched_content_hash(self) -> None:
+        bar = sample_bar()
+        snapshot = MarketSnapshot.from_bars(
+            market=bar.market,
+            instrument_id=bar.instrument_id,
+            timeframe=bar.timeframe,
+            source_provider=bar.provider,
+            as_of=bar.closed_at,
+            bars=[bar],
+        )
+
+        with RaisesValidationError("snapshot_content_hash must match"):
+            MarketSnapshot.model_validate(
+                {
+                    **snapshot.model_dump(),
+                    "snapshot_content_hash": "0" * 64,
+                }
             )
 
     def test_bar_closed_event_rejects_unclosed_bar(self) -> None:

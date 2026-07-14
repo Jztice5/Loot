@@ -237,11 +237,72 @@ class ContractModelTest(unittest.TestCase):
                 state=SignalState.ARMED,
                 priority=Priority.HIGH,
                 actionability=Actionability.WATCH_ONLY,
+                generation=1,
+                setup_key="setup:signal-1:1",
                 latest_decision_ticket_id=uuid4(),
                 dedupe_key="signal-1",
                 last_transition_at=aware_now(),
                 expires_at=aware_now() - timedelta(minutes=1),
                 version=0,
+            )
+
+    def test_initial_observing_signal_contract(self) -> None:
+        signal = SignalInstance(
+            id=uuid4(),
+            watch_item_id=uuid4(),
+            market=Market.CRYPTO,
+            instrument_id=uuid4(),
+            timeframe=Timeframe.H1,
+            signal_type=SignalType.MARKET_STRUCTURE,
+            state=SignalState.OBSERVING,
+            priority=Priority.NORMAL,
+            actionability=Actionability.WATCH_ONLY,
+            generation=1,
+            setup_key="setup:initial:1",
+            dedupe_key="signal:initial:1",
+            last_transition_at=aware_now(),
+            version=0,
+        )
+
+        self.assertIsNone(signal.latest_decision_ticket_id)
+        self.assertEqual(signal.generation, 1)
+
+        invalid_identity_fields = (
+            ("generation", 0, "greater than or equal to 1"),
+            ("setup_key", " ", "must not be empty"),
+            (
+                "latest_decision_ticket_id",
+                uuid4(),
+                "must be empty in initial OBSERVING state",
+            ),
+        )
+        for field_name, value, expected_message in invalid_identity_fields:
+            with self.subTest(field_name=field_name):
+                with RaisesValidationError(expected_message):
+                    SignalInstance.model_validate(
+                        {
+                            **signal.model_dump(),
+                            field_name: value,
+                        }
+                    )
+
+    def test_non_observing_signal_requires_decision_ticket(self) -> None:
+        with RaisesValidationError("latest_decision_ticket_id is required"):
+            SignalInstance(
+                id=uuid4(),
+                watch_item_id=uuid4(),
+                market=Market.CRYPTO,
+                instrument_id=uuid4(),
+                timeframe=Timeframe.H1,
+                signal_type=SignalType.MARKET_STRUCTURE,
+                state=SignalState.ARMED,
+                priority=Priority.NORMAL,
+                actionability=Actionability.WATCH_ONLY,
+                generation=1,
+                setup_key="setup:armed:1",
+                dedupe_key="signal:armed:1",
+                last_transition_at=aware_now(),
+                version=1,
             )
 
     def test_decision_ticket_requires_evidence_refs_and_skill_versions(self) -> None:

@@ -48,6 +48,30 @@ class FakeCryptoProviderTest(unittest.TestCase):
         self.assertTrue(all(bar.is_closed for bar in snapshot.bars))
         self.assertEqual(snapshot.bars[-1].close_price, snapshot.bars[0].close_price + 2)
 
+    def test_fake_provider_uses_full_window_for_snapshot_identity(self) -> None:
+        provider = FakeCryptoProvider(
+            received_at=datetime(2026, 7, 10, 8, 0, tzinfo=UTC)
+        )
+        instrument = sample_crypto_instrument(venue="FAKE")
+
+        two_bar_snapshot = provider.fetch_recent_bars(
+            instrument,
+            Timeframe.H1,
+            limit=2,
+        )
+        three_bar_snapshot = provider.fetch_recent_bars(
+            instrument,
+            Timeframe.H1,
+            limit=3,
+        )
+
+        self.assertNotEqual(
+            two_bar_snapshot.snapshot_content_hash,
+            three_bar_snapshot.snapshot_content_hash,
+        )
+        self.assertNotEqual(two_bar_snapshot.snapshot_key, three_bar_snapshot.snapshot_key)
+        self.assertNotEqual(two_bar_snapshot.id, three_bar_snapshot.id)
+
     def test_fake_provider_rejects_non_crypto_instrument(self) -> None:
         provider = FakeCryptoProvider()
         instrument = Instrument(

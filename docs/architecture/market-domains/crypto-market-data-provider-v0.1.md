@@ -217,10 +217,10 @@ $env:PYTHONPATH='D:\my-projects\Loot\src'
 py -3.12 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-结果：
+结果（2026-07-14 REQ-0009 回归）：
 
 ```text
-Ran 30 tests
+Ran 41 tests
 OK
 ```
 
@@ -232,9 +232,9 @@ py -3.12 -m compileall src tests
 
 结果：通过。
 
-第二轮设计复核已复现旧实现中 `limit=2` 与 `limit=3` 的不同窗口得到相同
-snapshot_id。该行为纳入 `REQ-0009` 修复，在修复前不能把 snapshot_id 作为可靠的
-Golden Case 输入身份。
+第二轮设计复核复现的 `limit=2` 与 `limit=3` 身份冲突已由 `REQ-0009` 修复。
+`MarketSnapshot.from_bars` 现在统一生成并校验 content hash、key 和稳定 UUID；修改窗口
+长度、历史内容或闭合状态均会产生不同 identity。
 
 真实 OKX public REST smoke 已通过，输出格式如下：
 
@@ -253,10 +253,9 @@ latest_closed_same= True
 
 下一步建议：
 
-1. 先按 `REQ-0009` 修复 Snapshot 身份和闭合时间不变量。
-2. 建立 Crypto 第一批 Golden Case，固定输入和候选预期。
-3. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
-4. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
-5. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
-6. 再进入 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine
+1. 建立 Crypto 第一批 Golden Case，固定输入和候选预期。
+2. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
+3. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
+4. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
+5. 再进入 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine
    闭环。
