@@ -22,6 +22,8 @@
 - 时间型资料按 `yyyy-Qn` 归档；季度总览、需求管理和开发计划文件名显式带季度标记。
 - 项目级 `vibe-context-manager` 权威副本位于
   `docs/skills/vibe-context-manager/SKILL.md`，通过 Git 支持多端同步。
+- 当前上下文结构进入稳定观察期；没有达到需求管理中的量化触发条件前，不继续扩层、
+  拆分或引入 Context Linter，优先推进业务闭环。
 
 ## 设计主线
 
