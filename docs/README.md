@@ -7,6 +7,15 @@
 - 当前季度规划：[planning/2026-Q3/规划总览-2026-Q3.md](planning/2026-Q3/规划总览-2026-Q3.md)
 - 本地运行说明：[runbooks/local-run.md](runbooks/local-run.md)
 
+## 时间上下文模型
+
+- 过去式上下文：已经发生的过程、结果和证据，进入 development log、reviews 和已归档需求。
+- 现在进行时上下文：项目当前快照在 `development/memory.md` 维护，具体需求状态仍以 planning 原条目为准。
+- 未来规划上下文：尚未发生的需求、顺序和验收标准，进入 planning 并使用 Planned/Deferred 状态。
+- architecture、AGENTS 和 runbooks 是跨时间稳定上下文，从历史与当前工作中提炼并约束未来。
+
+权威定义：[Loot 时间上下文模型 V0.1](architecture/context/temporal-context-model-v0.1.md)。
+
 ## 架构设计
 
 - 系统宏观架构：[architecture/system/loot-system-architecture-v0.1.md](architecture/system/loot-system-architecture-v0.1.md)
@@ -15,6 +24,7 @@
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Signal State Machine：[architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 - Crypto 行情数据 Provider：[architecture/market-domains/crypto-market-data-provider-v0.1.md](architecture/market-domains/crypto-market-data-provider-v0.1.md)
+- 时间上下文模型：[architecture/context/temporal-context-model-v0.1.md](architecture/context/temporal-context-model-v0.1.md)
 
 ## 开发过程
 

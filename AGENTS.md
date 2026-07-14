@@ -23,6 +23,21 @@
 - 需求状态和推进顺序以当前季度 `docs/planning/<yyyy-Qn>/` 为准。
 - 历史验证必须保留日期和环境；不得把旧设备上的通过结果表述为当前机器已复验。
 
+## Temporal Context Model
+
+- 过去式上下文记录已经发生的过程、结果和证据，权威载体是 development log、review 和
+  已完成或归档需求；归档后不覆盖改写业务结论。
+- 现在进行时上下文记录当前真实状态、焦点、阻塞和本机验证；项目级快照入口是
+  `docs/development/memory.md`，具体需求状态仍由 planning 原条目负责，Git 与 runtime
+  状态必须实时检查。
+- 未来规划上下文记录尚未发生的需求、顺序和验收标准，权威载体是当前季度 planning；
+  Planned/Deferred 项不能表述为已经实现或验证。
+- architecture、AGENTS 和 runbooks 是跨时间稳定上下文，不表达任务完成状态。
+- 任务开始时执行 `未来规划 -> 现在进行时`；完成、取消或替代时执行
+  `现在进行时 -> 过去式`，并把可复用结论晋升到稳定层。
+
+详细规则见 `docs/architecture/context/temporal-context-model-v0.1.md`。
+
 ## Project Skill Source
 
 - `docs/skills/vibe-context-manager/SKILL.md` 是 Loot 的权威 skill 副本。

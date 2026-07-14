@@ -25,6 +25,7 @@ Windows PowerShell：
 
 - 必需上下文入口是否存在。
 - 根 README 是否把当前事实委托给 memory/planning。
+- 三类时间上下文的权威定义和入口标记是否完整。
 - Markdown 本地链接目标是否存在。
 - planning、development log 和 reviews 的季度目录、文件命名及总览登记。
 - `memory.md` 和项目 Skill 是否超过加载预算。
@@ -65,6 +66,16 @@ rg --files docs
 - 详细设计链接到 architecture，不复制稳定规则全文。
 - 当前验证记录包含日期、OS、Python、Git 基线和实际命令。
 - 超过约 150 行或无法在两分钟内扫完时立即瘦身。
+
+### 2.1 时间上下文
+
+- 过去式上下文包含日期、结果和证据，不冒充当前状态。
+- 现在进行时上下文与实时 Git、runtime、当前需求状态一致。
+- 未来规划上下文使用 Planned/Deferred 等显式状态，不宣称已经实现或验证。
+- 任务开始时从未来规划进入现在进行时，结束时沉淀为过去式。
+- 可复用规则已晋升到 architecture、AGENTS 或 runbooks，而不是只藏在历史日志中。
+
+详细判定见 [Loot 时间上下文模型](../architecture/context/temporal-context-model-v0.1.md)。
 
 ### 3. Architecture、Log、Review 和 Planning
 

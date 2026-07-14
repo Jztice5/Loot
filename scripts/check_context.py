@@ -25,11 +25,24 @@ REQUIRED_PATHS = (
     "docs/README.md",
     "docs/development/memory.md",
     "docs/architecture/README.md",
+    "docs/architecture/context/temporal-context-model-v0.1.md",
     "docs/planning/README.md",
     "docs/reviews/README.md",
     "docs/development/log/README.md",
     "docs/runbooks/context-health-check.md",
     "docs/skills/vibe-context-manager/SKILL.md",
+)
+
+TEMPORAL_CONTEXT_FILES = (
+    "AGENTS.md",
+    "docs/README.md",
+    "docs/architecture/context/temporal-context-model-v0.1.md",
+    "docs/skills/vibe-context-manager/SKILL.md",
+)
+TEMPORAL_CONTEXT_MARKERS = (
+    "过去式上下文",
+    "现在进行时上下文",
+    "未来规划上下文",
 )
 
 
@@ -72,6 +85,17 @@ def check_root_readme(report: Report) -> None:
         report.error("root README must link to docs/development/memory.md")
     if re.search(r"^## (当前状态|当前阶段|下一步)\s*$", content, re.MULTILINE):
         report.error("root README duplicates volatile project status; keep it in memory/planning")
+
+
+def check_temporal_context_model(report: Report) -> None:
+    for relative_path in TEMPORAL_CONTEXT_FILES:
+        path = ROOT / relative_path
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        for marker in TEMPORAL_CONTEXT_MARKERS:
+            if marker not in content:
+                report.error(f"temporal context marker missing in {relative_path}: {marker}")
 
 
 def check_local_links(report: Report, files: list[Path]) -> int:
@@ -237,6 +261,7 @@ def main() -> int:
     files = markdown_files()
     check_required_paths(report)
     check_root_readme(report)
+    check_temporal_context_model(report)
     links_checked = check_local_links(report, files)
     check_quarter_layout(report)
     memory_lines, skill_lines = check_size_budgets(report)

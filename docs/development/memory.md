@@ -16,6 +16,8 @@
 - 当前需求状态：[需求管理 2026-Q3](../planning/2026-Q3/需求管理-2026-Q3.md)。
 - 当前上下文框架已完成长期开发加固和 macOS 适配：根 README 不再复制动态状态，
   AGENTS 按任务加载设计，`make context-check` 提供自动健康检查。
+- 当前上下文采用[时间上下文模型](../architecture/context/temporal-context-model-v0.1.md)：
+  过去式保存证据，现在进行时保存当前事实，未来规划保存尚未发生的需求。
 - 项目级 `vibe-context-manager` 权威副本位于
   `docs/skills/vibe-context-manager/SKILL.md`，全局安装目录只是镜像。
 
@@ -85,6 +87,7 @@ WatchItem / TradingPlan / PositionEvent
 | 2026-07-14 | REQ-0009 地基修正 | [过程记录](log/2026-Q3/2026-07-14-req-0009-foundation-invariants.md) |
 | 2026-07-14 | 上下文季度化 | [过程记录](log/2026-Q3/2026-07-14-quarterly-doc-organization.md) |
 | 2026-07-14 | 上下文长期加固与 macOS 适配 | [过程记录](log/2026-Q3/2026-07-14-context-framework-macos-hardening.md) |
+| 2026-07-14 | 三类时间上下文模型 | [过程记录](log/2026-Q3/2026-07-14-temporal-context-model.md) |
 
 ## 未完成
 
