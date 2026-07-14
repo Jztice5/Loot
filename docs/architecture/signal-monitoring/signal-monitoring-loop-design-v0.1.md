@@ -5,6 +5,7 @@
 | 状态 | Proposed |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
+| 最后设计回归 | 2026-07-14 |
 | 依赖 | Loot 宏观技术设计 |
 | 涉及领域 | Platform、Crypto、US Equity、A-Share、Signal、Alert |
 
@@ -32,7 +33,9 @@
 - 用户可以为WatchItem配置TradingPlan。
 - 用户可以手动记录持仓和持仓变化。
 - WatchItem按market确定性路由到独立Market Domain。
-- 市场数据触发候选事件后，Agent通过受控Skills产生DecisionTicket。
+- 市场数据触发候选事件后，确定性分析器或 Agent 通过受控 Skills 产生
+  DecisionProposal。
+- Policy Gate 审核 Proposal，只有批准时才签发 DecisionTicket。
 - Signal状态机只在合法状态变化时发布SignalEvent。
 - Alert Center按优先级、去重和冷却规则提醒。
 - 所有人工动作、Skill执行和Signal变化可审计、可回放。
@@ -92,10 +95,13 @@ flowchart TD
     W["WatchItem・TradingPlan・Position"] --> R["Market Router"]
     R --> D["独立 Market Domain"]
     D --> P["PreFilter"]
-    P --> A["Market Agent"]
-    A --> K["Skill Runtime"]
-    K --> G["Policy Gate"]
-    G --> S["Signal State Machine"]
+    P --> CE["CandidateEvent"]
+    CE --> A["Deterministic Analyzer 或 Market Agent"]
+    A --> K["EvidenceSet"]
+    K --> DP["DecisionProposal"]
+    DP --> G["Policy Gate"]
+    G --> DT["DecisionTicket"]
+    DT --> S["Signal State Machine"]
     S --> C["Signal Center"]
     C --> L["Alert Center"]
     L --> U["用户人工决策"]
@@ -135,7 +141,8 @@ sequenceDiagram
 sequenceDiagram
     participant P as Provider
     participant M as Market Domain
-    participant A as Agent与Skills
+    participant A as Analyzer或Agent与Skills
+    participant G as Policy Gate
     participant S as Signal Platform
     participant U as Alert与用户
 
@@ -146,12 +153,20 @@ sequenceDiagram
     else 满足候选条件
         M->>A: Candidate和Context
         A->>A: 执行允许的Skills
-        A-->>M: DecisionTicket
-        M->>M: Policy Gate
-        M->>S: 申请Signal状态迁移
-        S->>S: 幂等、合法迁移、优先级
-        S->>U: 状态变化提醒
-        U-->>S: 人工操作或忽略
+        A-->>G: Evidence和DecisionProposal
+        G->>G: 记录PolicyEvaluation
+        alt Policy拒绝或延后
+            G-->>M: 保存原因，不签发Ticket
+        else Policy批准
+            G->>S: DecisionTicket
+            S->>S: 幂等、合法迁移、优先级
+            alt 状态发生变化
+                S->>U: SignalEvent与提醒
+                U-->>S: 人工操作或忽略
+            else 合法no-op
+                S-->>G: 不生成SignalEvent
+            end
+        end
     end
 ```
 
@@ -292,7 +307,9 @@ SignalInstance
          WEAKENING | INVALIDATED | RESOLVED | EXPIRED
 - priority: Priority
 - actionability: Actionability
-- latest_decision_ticket_id: UUID
+- latest_decision_ticket_id: UUID | null
+- generation: integer
+- setup_key: string
 - dedupe_key: string
 - last_transition_at: UTC datetime
 - expires_at: UTC datetime | null
@@ -302,8 +319,22 @@ SignalInstance
 唯一键建议：
 
 ```text
-(watch_item_id, position_id nullable, timeframe, signal_type, dedupe_key)
+生命周期唯一键：(watch_item_id, timeframe, signal_type, generation)
+市场结构 setup：(watch_item_id, timeframe, signal_type, setup_key)，position_id 必须为空
+持仓风险 setup：(position_id, timeframe, signal_type, setup_key)，使用独立 SignalType
 ```
+
+持久化时使用 partial unique index，保证同一监控身份同一时刻最多一个非终态 Signal，
+并避免 nullable position_id 让同一市场结构信号重复创建。
+
+当 MonitoringSubscription 首次激活某个 SignalType 时，由 Signal State Machine 的
+初始化入口幂等创建 `OBSERVING` SignalInstance。初始化不表达市场判断，因此不需要
+DecisionTicket；初始化之后的所有状态变化都必须持 Policy Gate 签发的 Ticket。
+Agent、Skill、PreFilter 和 Decision Builder 均不能创建 SignalInstance。
+
+初始 Signal 的 `latest_decision_ticket_id` 为 null，generation 从 1 开始。Signal 到达
+INVALIDATED、RESOLVED 或 EXPIRED 后，新的 setup_key 可以由状态机初始化下一代
+OBSERVING Signal；上一代历史不可覆盖或复用。
 
 ## 10. State Machines
 
@@ -364,6 +395,9 @@ stateDiagram-v2
 ```
 
 每个Market Domain提供自己的TransitionPolicy。共享状态机引擎只执行转换，不定义市场条件。
+
+终态没有出边不代表监控永久停止。终态关闭当前 generation，下一轮结构通过状态机
+初始化新的 SignalInstance，禁止把终态实例重置回 OBSERVING。
 
 ## 11. API Design
 
@@ -525,6 +559,10 @@ CandidateEvent
 - 当前价格接近持仓失效位置
 - 新信息事件映射到该标的
 
+市场结构候选的真假只由市场事实决定。Position 可以影响 Policy、优先级、
+position_impact 和提醒语义，但不能把未成立的市场结构变成已成立。未来持仓专属风险
+应使用独立候选或 SignalType。
+
 ## 15. Agent Context
 
 Context Builder只提供任务所需信息：
@@ -590,7 +628,7 @@ a_share.market_structure_assessment
 
 ## 17. Decision and Signal Application
 
-DecisionSkill生成DecisionTicket，但不直接写Signal：
+Decision Skill 或确定性 Decision Builder 生成 DecisionProposal，但不直接写 Signal：
 
 ```text
 suggested_transition
@@ -601,16 +639,34 @@ position_impact
 invalidation
 next_check_at
 explanation
+expected_signal_version
+watch_item_version
+trading_plan_config_version
+position_version
+context_digest
 ```
 
-Signal State Machine执行：
+Policy Gate 执行：
+
+1. 按 Proposal 读取 Evidence、输入快照和上下文版本。
+2. 执行数据质量、市场规则、Skill 版本、持仓一致性和 TransitionPolicy Guard。
+3. 按 evaluation_request_id 做投递幂等；DEFERRED 重评使用新的评估上下文摘要。
+4. 写入不可变 `PolicyEvaluation`。
+5. 仅在 `APPROVED` 时签发不可变且有有效期的 `DecisionTicket`；一个 Proposal 最多
+   一张 Ticket。
+
+Signal State Machine 执行：
 
 1. 按signal_id读取当前状态和version。
-2. 检查DecisionTicket未被消费。
-3. 运行市场TransitionPolicy。
-4. 使用乐观锁写入新状态。
-5. 追加SignalTransition记录。
-6. 发布signal.state_changed。
+2. 通过 AuthorizationRepository 加载 Proposal、PolicyEvaluation 和 DecisionTicket；
+   生产适配器使用 PostgreSQL，Phase 0 使用内存适配器。
+3. 校验 APPROVED、proposal_digest、Ticket 有效期和 payload 指纹。
+4. 校验 expected_signal_version、context_digest 和当前业务版本。
+5. 校验 `authorized_transition` 在合法迁移表内。
+6. 使用完整模型校验构建新投影；不得用跳过 validator 的局部复制写事实。
+7. 使用乐观锁写入新状态。
+8. 追加SignalTransition记录。
+9. 发布signal.state_changed。
 
 重复消费同一DecisionTicket必须返回同一个结果。
 
@@ -669,10 +725,18 @@ channel
 
 ### 19.3 Signal Transition
 
+Policy Gate 在独立事务中写入 PolicyEvaluation，并在批准时同时写入
+DecisionTicket 和 OutboxEvent。evaluation_request_id 保证投递幂等；
+`proposal_id + policy_version + evaluation_context_digest` 区分评估尝试；
+DecisionTicket 对 proposal_id 设置唯一约束。
+
+Signal 初始化也必须是幂等事务：按监控身份、generation 和 setup_key 创建 OBSERVING
+投影、初始化审计记录和 OutboxEvent，不允许存在多个活跃代。
+
 同一数据库事务：
 
-1. 校验DecisionTicket。
-2. 校验Signal version。
+1. 从事实源校验 Proposal、PolicyEvaluation 和 DecisionTicket 授权链。
+2. 校验 expected_signal_version、上下文版本和 payload 指纹。
 3. 追加SignalTransition。
 4. 更新SignalInstance。
 5. 标记DecisionTicket已应用。
@@ -688,7 +752,12 @@ channel
 | Position并发更新 | expected_version冲突返回409 |
 | 同一Bar重复到达 | provider_event_id和time bucket去重 |
 | Candidate重复投递 | candidate dedupe_key |
+| Proposal重复生成 | proposal dedupe_key |
+| 同一评估请求重复投递 | evaluation_request_id唯一约束 |
+| DEFERRED后重新评估 | 新evaluation_context_digest，追加PolicyEvaluation |
+| Ticket重复签发 | DecisionTicket.proposal_id唯一约束 |
 | DecisionTicket重复消费 | consumed_at和唯一约束 |
+| 相同Ticket ID但内容不同 | payload fingerprint冲突，拒绝并审计 |
 | Signal并发迁移 | version乐观锁和合法迁移校验 |
 | Alert重复消费 | alert dedupe_key唯一索引 |
 
@@ -702,7 +771,11 @@ channel
 | Agent超时 | 终止本次run，允许确定性降级 |
 | Skill超时 | SkillRun标记FAILED，DecisionSkill不得伪造Evidence |
 | LLM不可用 | 保留技术分析；信息解释降级 |
-| Policy拒绝 | 保存拒绝原因，必要时安排next_check_at |
+| Policy拒绝 | 保存 PolicyEvaluation 和拒绝原因，不签发 DecisionTicket |
+| Policy延后 | 保存 PolicyEvaluation，按 next_check_at 重新评估 |
+| DecisionTicket过期 | 状态机拒绝迁移并记录审计结果 |
+| Ticket授权链不一致 | 拒绝迁移并记录安全审计 |
+| Signal或业务上下文版本过期 | 废弃旧Ticket，重新生成Proposal和评估 |
 | Redis暂时不可用 | Outbox保留，恢复后重放 |
 | Alert渠道失败 | 独立重试，Signal状态不回滚 |
 | 用户版本冲突 | 返回当前投影，要求用户确认后重试 |
@@ -747,8 +820,9 @@ MarketSnapshot
 → Agent Run
 → SkillRuns
 → Evidence
+→ DecisionProposal
+→ PolicyEvaluation
 → DecisionTicket
-→ Policy结果
 → SignalTransition
 → AlertDelivery
 → User PositionEvent
@@ -783,6 +857,8 @@ MarketSnapshot
 - API schema
 - Event Envelope
 - Skill Manifest
+- DecisionProposal
+- PolicyEvaluation
 - DecisionTicket
 - SignalEvent
 - Provider adapter
@@ -791,7 +867,10 @@ MarketSnapshot
 
 - 创建WatchItem后生成正确MonitoringSubscription。
 - OPEN事件创建Position并进入对应市场上下文。
-- Candidate到Signal再到Alert完整闭环。
+- Candidate 到 Proposal、Policy、Ticket、Signal 再到 Alert 的完整闭环。
+- Policy 拒绝时不产生 DecisionTicket 和 SignalEvent。
+- Policy DEFERRED 后可在新上下文中追加评估，不被首次结果永久阻塞。
+- Ticket 授权链或上下文版本不匹配时不产生 SignalEvent。
 - Redis重复消息不产生重复Signal。
 - Alert失败不回滚Signal。
 
@@ -799,12 +878,16 @@ MarketSnapshot
 
 至少准备以下Golden Case：
 
-1. 自选接近阻力，进入ARMED。
-2. 放量突破，进入TRIGGERED。
-3. 收盘确认，进入CONFIRMED。
-4. 突破失败，进入INVALIDATED。
-5. 持仓高点降低并结构破坏，进入WEAKENING再RESOLVED。
-6. 同一事件重复三次，只产生一次状态迁移和提醒。
+1. 普通上涨但未突破，不产生 Candidate。
+2. 已收盘 K 线确认突破，产生 Candidate。
+3. 未收盘 K 线盘中突破，不产生 Candidate。
+4. Policy 拒绝 Proposal，不产生 DecisionTicket 和 SignalEvent。
+5. Policy DEFERRED 到期后在新上下文中重新评估。
+6. 自选接近阻力，进入ARMED。
+7. 放量突破，进入TRIGGERED。
+8. 突破失败，进入INVALIDATED；新 setup 可创建下一代 OBSERVING Signal。
+9. 同一事件重复三次，只产生一次状态迁移和提醒。
+10. 相同 Ticket ID 修改 payload 后被拒绝为冲突。
 
 三个市场必须分别维护Golden Case，不能只复用输入数据。
 
@@ -816,8 +899,15 @@ MarketSnapshot
 - WatchItem只能进入对应Market Domain。
 - 没有Candidate时不会触发Agent。
 - Agent只能调用市场allowlist内Skill。
-- Signal状态只通过Policy和状态机改变。
+- DecisionProposal 不能直接进入状态机。
+- Signal 状态只通过 Policy Gate 签发的 DecisionTicket 和状态机改变。
+- Policy 拒绝或延后时不产生 DecisionTicket。
+- DEFERRED 可以重评，但同一次评估请求保持幂等。
+- Ticket 必须绑定并验证 Signal 与业务上下文版本。
+- Signal 投影更新必须重新运行完整契约校验。
 - 同一DecisionTicket不会重复迁移。
+- 相同 Ticket ID 的不同内容必须拒绝。
+- 终态后的新结构创建下一代 Signal，不重置历史实例。
 - Signal状态变化后能产生一次有效提醒。
 - 用户操作后，下一次分析使用最新Position投影。
 - 核心链路可通过correlation_id完整追踪。
@@ -832,7 +922,9 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - Market、InstrumentType、Timeframe、SignalState枚举
 - EventEnvelope
 - WatchItem、TradingPlan、PositionEvent
-- CandidateEvent、EvidenceSet、DecisionTicket、SignalEvent
+- CandidateEvent、EvidenceSet、DecisionProposal、PolicyEvaluation、DecisionTicket、
+  SignalEvent
+- SignalInstance 的 nullable latest ticket、generation 和 setup_key
 
 ### Step 2：Persistence
 
@@ -852,13 +944,16 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 ### Step 4：Signal Foundation
 
 - SignalInstance
+- initialize / next generation
 - transition engine
 - domain-owned transition policy interface
 - dedupe和optimistic locking
+- validated projection rebuild 和 payload fingerprint
 
 ### Step 5：Market Vertical Stub
 
 - 每个市场建立独立domain package
+- 先定义 Golden Case 输入和预期
 - 使用FakeProvider和FakePreFilter
 - 验证三条route不串线
 
@@ -876,7 +971,11 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - Context Builder
 - Market Agent接口
 - Decision Skill
+- DecisionProposal
 - mandatory guards
+- evaluation_request 和 DEFERRED re-evaluation
+- PolicyEvaluation 和 DecisionTicket 签发
+- AuthorizationRepository
 - DecisionTicket application
 
 ### Step 8：Alert Loop
@@ -894,11 +993,11 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - K线Signal标注
 - 快捷人工操作
 
-### Step 10：Real Provider and Replay
+### Step 10：Real Provider and Replay Expansion
 
 - 选择首个市场Provider
 - 历史数据导入
-- Golden Cases
+- 扩展 Golden Cases
 - 端到端Replay
 
 ## 27. Rollout and Rollback

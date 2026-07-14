@@ -11,6 +11,7 @@
 
 - 系统宏观架构：[architecture/system/loot-system-architecture-v0.1.md](architecture/system/loot-system-architecture-v0.1.md)
 - 核心契约设计：[architecture/contracts/loot-contracts-v0.1.md](architecture/contracts/loot-contracts-v0.1.md)
+- 决策运行时与授权链路：[architecture/runtime/decision-flow-v0.1.md](architecture/runtime/decision-flow-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Signal State Machine：[architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 - Crypto 行情数据 Provider：[architecture/market-domains/crypto-market-data-provider-v0.1.md](architecture/market-domains/crypto-market-data-provider-v0.1.md)
@@ -22,12 +23,16 @@
 - 核心契约骨架过程：[development/log/2026-07-10-contracts-foundation.md](development/log/2026-07-10-contracts-foundation.md)
 - Signal State Machine 过程：[development/log/2026-07-10-signal-state-machine.md](development/log/2026-07-10-signal-state-machine.md)
 - Crypto 行情 Provider 过程：[development/log/2026-07-10-crypto-market-data-provider.md](development/log/2026-07-10-crypto-market-data-provider.md)
+- 决策链路设计回归：[development/log/2026-07-14-decision-flow-design-regression.md](development/log/2026-07-14-decision-flow-design-regression.md)
+- 第二轮地基约束收敛：[development/log/2026-07-14-foundation-constraints.md](development/log/2026-07-14-foundation-constraints.md)
 - 过程记录模板：[development/log/TEMPLATE.md](development/log/TEMPLATE.md)
 
 ## 评审记录
 
 - 设计分层校对备忘录：[reviews/loot-design-layering-review-2026-07-10.md](reviews/loot-design-layering-review-2026-07-10.md)
 - Crypto 行情地基评审：[reviews/crypto-market-data-foundation-review-2026-07-10.md](reviews/crypto-market-data-foundation-review-2026-07-10.md)
+- 端到端设计回归评审：[reviews/loot-end-to-end-design-review-2026-07-14.md](reviews/loot-end-to-end-design-review-2026-07-14.md)
+- 地基第二轮复核：[reviews/loot-foundation-second-review-2026-07-14.md](reviews/loot-foundation-second-review-2026-07-14.md)
 
 ## Runbooks
 

@@ -73,6 +73,8 @@ Provider 只能生成行情事实，不能直接产生 Signal，也不能绕过 
 - `low_price` 必须覆盖 open、close、high。
 - `closed_at` 必须晚于 `opened_at`。
 - `received_at` 不能早于 `opened_at`。
+- `is_closed=True` 时 `received_at` 必须大于等于 `closed_at`，禁止未来 K 线被提前
+  标记为已收盘。
 - `is_closed=False` 可以进入快照，但不能发布 `MarketBarClosedEvent`。
 
 ### 3.2 MarketSnapshot
@@ -86,7 +88,13 @@ Provider 只能生成行情事实，不能直接产生 Signal，也不能绕过 
 - 所有 `bars` 必须与 snapshot 的 market、instrument、timeframe、source_provider 一致。
 - `bars` 必须按 `opened_at` 升序排列。
 - 同一 snapshot 内 `provider_event_id` 不能重复。
-- `snapshot_key` 是 replay 和幂等输入，不是用户展示字段。
+- `snapshot_content_hash` 必须基于完整 Snapshot 事实生成，包含 as_of，并至少包含每根
+  有序 K 线的 identity、OHLCV、闭合状态和时间字段。
+- `snapshot_key` 由 provider、instrument、timeframe 和 snapshot_content_hash 生成，
+  不能只使用最新一根 K 线。
+- K 线窗口长度、任一历史 K 线修正或闭合状态变化时，snapshot_key 和 snapshot_id
+  必须变化。
+- `as_of` 必须晚于等于所有已收盘 K 线的 `closed_at`。
 - `latest_bar` 可能是未收盘 K 线；PreFilter 默认应使用 `latest_closed_bar`。
 
 ### 3.3 MarketBarClosedEvent
@@ -167,14 +175,27 @@ ts, open, high, low, close, volume, volume_ccy, volume_ccy_quote, confirm
 
 ```text
 provider_event_id = provider + venue + symbol + timeframe + opened_at
-snapshot_key = provider + instrument_id + timeframe + latest provider_event_id
+snapshot_content_hash = sha256(canonical Snapshot facts including as_of and ordered bars)
+snapshot_key = provider + instrument_id + timeframe + snapshot_content_hash
+snapshot_id = stable_uuid(snapshot_key)
 ```
+
+Canonical 序列化规则：
+
+- 顶层固定包含 provider、market、instrument_id、timeframe 和 UTC as_of。
+- bars 按 opened_at 升序，禁止在 hash 前自行重排或过滤。
+- 每根 bar 固定包含 provider_event_id、opened_at、closed_at、OHLCV、quote_volume、
+  is_closed 和 received_at。
+- datetime 使用 UTC ISO-8601；Decimal 去除无意义尾零后序列化，零统一为 `0`。
+- 使用 UTF-8 canonical JSON、固定字段名和紧凑分隔符，再计算 SHA-256。
 
 后续接 Redis Streams 或 PostgreSQL 时：
 
 - 同一 `provider_event_id` 只能生成一条标准 K 线事实。
 - `MarketBarClosedEvent.dedupe_key` 应包含 provider、instrument、timeframe 和 opened_at。
 - Replay 使用 `snapshot_key` 锁定输入窗口。
+- 相同最新 K 线但窗口长度或历史内容不同的快照必须具有不同 identity。
+- Provider 对历史 K 线做修正时保留旧快照事实，新内容形成新 snapshot_content_hash。
 
 ## 6. 错误处理
 
@@ -211,6 +232,10 @@ py -3.12 -m compileall src tests
 
 结果：通过。
 
+第二轮设计复核已复现旧实现中 `limit=2` 与 `limit=3` 的不同窗口得到相同
+snapshot_id。该行为纳入 `REQ-0009` 修复，在修复前不能把 snapshot_id 作为可靠的
+Golden Case 输入身份。
+
 真实 OKX public REST smoke 已通过，输出格式如下：
 
 ```text
@@ -228,8 +253,10 @@ latest_closed_same= True
 
 下一步建议：
 
-1. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
-2. 建立 Crypto 第一批 Golden Case。
-3. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
-4. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
-5. 再进入 Policy Gate、DecisionTicket 和 Signal State Machine 闭环。
+1. 先按 `REQ-0009` 修复 Snapshot 身份和闭合时间不变量。
+2. 建立 Crypto 第一批 Golden Case，固定输入和候选预期。
+3. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
+4. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
+5. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
+6. 再进入 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine
+   闭环。

@@ -2,9 +2,10 @@
 
 | 属性 | 值 |
 |---|---|
-| 状态 | Implemented |
+| 状态 | Implemented（授权契约迁移待完成） |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
+| 最后设计回归 | 2026-07-14 |
 | 依赖 | 核心契约设计、自选与持仓信号监控闭环 |
 | 代码位置 | `src/loot/signals/state_machine.py` |
 | 适用范围 | Phase 0：Signal Foundation |
@@ -17,8 +18,10 @@ Policy Gate 的 `DecisionTicket`，输出新的 `SignalInstance` 投影和
 
 目标：
 
+- 由状态机幂等初始化 OBSERVING Signal，并管理 generation。
 - 固定 V0.1 合法迁移表。
 - 阻止 Agent、Skill 或普通消费者直接改变 Signal 状态。
+- 从事实源验证 Proposal、PolicyEvaluation 和 DecisionTicket 授权链。
 - 同一个 `DecisionTicket` 重复消费时返回首次结果，不重复生成事件。
 - `suggested_transition` 等于当前状态时不生成 `SignalEvent`。
 - 在没有数据库前，用内存账本验证状态机语义。
@@ -33,11 +36,24 @@ Policy Gate 的 `DecisionTicket`，输出新的 `SignalInstance` 投影和
 ## 2. 调用链
 
 ```text
-DecisionTicket
+DecisionProposal
 -> Policy Gate
+-> DecisionTicket
 -> SignalStateMachine.apply
 -> SignalInstance / SignalEvent
 -> Alert Center / Replay / Projection
+```
+
+状态机只看到 Policy Gate 签发后的 DecisionTicket，不接收 DecisionProposal，也不负责
+在内部重新运行 Policy；但必须从 PostgreSQL 事实源核验 APPROVED 结果、摘要、版本和
+有效期，不能信任调用方可以任意构造的对象。
+
+初始化链路：
+
+```text
+MonitoringSubscription / New Setup
+-> SignalStateMachine.initialize
+-> OBSERVING SignalInstance(generation, latest_decision_ticket_id=null)
 ```
 
 ## 3. 合法迁移表
@@ -60,7 +76,7 @@ V0.1 严格采用闭环设计文档中的最小迁移表：
 
 ## 4. Apply 语义
 
-`SignalStateMachine.apply(current_signal, decision_ticket)` 执行步骤：
+当前 `SignalStateMachine.apply(current_signal, decision_ticket)` 执行步骤：
 
 1. 以 `decision_ticket.id` 查询内存幂等账本。
 2. 命中时返回首次 `SignalTransitionResult`，标记 `duplicate=True`。
@@ -76,6 +92,22 @@ V0.1 严格采用闭环设计文档中的最小迁移表：
 7. 生成 `SignalEvent`，包含 from/to state、priority、actionability、position impact。
 8. 将结果写入内存账本。
 
+当前代码字段仍名为 `suggested_transition`。按 2026-07-14 的授权链路回归，后续契约
+迁移后应改为读取 `authorized_transition`，并校验 Ticket 的有效期、
+`policy_evaluation_id` 和 `proposal_digest`。在迁移完成前，调用方必须把测试中的
+DecisionTicket 视为“已通过 Policy 的模拟票据”。
+
+第二轮复核增加以下强制修正规则：
+
+- Ticket 必须绑定 expected_signal_version、业务上下文版本和 context_digest。
+- 状态机必须先加载并核对持久化授权链，再登记 Ticket 消费。
+- Signal 更新必须重新运行 Pydantic 完整校验；禁止使用跳过 validator 的
+  `model_copy(update=...)` 直接形成事实投影。
+- occurred_at 必须先归一化为 UTC。
+- 迁移时间晚于当前 expires_at 时必须拒绝旧 Ticket 或按明确规则结束当前 generation，
+  不能返回 expires_at 早于 last_transition_at 的投影。
+- 相同 Ticket ID 只有完整 payload 指纹一致时才视为重复；内容不同必须抛出冲突。
+
 ## 5. 幂等和重复消费
 
 V0.1 幂等键：
@@ -89,12 +121,14 @@ decision_ticket.id
 - 返回首次迁移结果。
 - 不增加 Signal version。
 - 不生成新 event_id。
-- 如果相同 DecisionTicket ID 被用于不同 Signal 或不同目标状态，抛出
+- 如果相同 DecisionTicket ID 的 signal、目标状态、授权摘要、上下文版本、
+  actionability、position_impact 或其他 payload 字段不同，抛出
   `DuplicateDecisionConflictError`。
 
 未来接入数据库后，该内存账本应替换为：
 
 - `decision_ticket.consumed_at`
+- `decision_ticket.payload_fingerprint`
 - `signal_transition` 唯一约束
 - outbox 事件唯一约束
 
@@ -113,12 +147,18 @@ decision_ticket.id
 - 合法迁移生成事件并更新投影。
 - 非法迁移被拒绝。
 - 重复 `DecisionTicket` 不重复生成事件。
+- 相同 Ticket ID 但 payload 不同被拒绝。
 - 同状态 `DecisionTicket` 不生成事件。
 - DecisionTicket 与 Signal 身份不一致时拒绝。
+- 迁移后 SignalInstance 仍满足 expires_at 和 UTC 不变量。
+- 初始 Signal 不需要伪造 latest_decision_ticket_id。
+- 终态后新 setup 生成下一代 Signal，旧实例保持不可变历史。
 
 ## 8. 后续扩展
 
 - 接入持久化仓库和乐观锁。
 - 引入市场专属 `TransitionPolicy`，但共享状态机仍只负责执行迁移。
+- 先完成 `DecisionProposal -> PolicyEvaluation -> DecisionTicket` 契约迁移，状态机
+  不再接收任何 Policy 前对象。
 - 为 DecisionTicket 消费增加 outbox 事务设计。
 - 补 Golden Case，覆盖重复事件、非法迁移和 Alert 去重。

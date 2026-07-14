@@ -5,6 +5,7 @@
 | 状态 | Proposed |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
+| 最后设计回归 | 2026-07-14 |
 | 依赖 | Loot 系统宏观架构、自选与持仓信号监控闭环 |
 | 适用范围 | Phase 0：Architecture Foundation |
 
@@ -17,7 +18,8 @@
 - 先定义稳定契约，再实现生产者和消费者。
 - 所有跨模块事件使用统一 `EventEnvelope`。
 - 手动持仓变化只通过 `PositionEvent` 追加记录。
-- Signal 变化只通过状态迁移事件表达，不允许 Agent 直接写状态。
+- Signal 变化只通过 Policy Gate 签发的 `DecisionTicket` 和状态机表达，不允许
+  Agent、Skill 或确定性分析器直接写状态。
 - 所有时间字段内部统一为 UTC aware datetime。
 
 非目标：
@@ -27,7 +29,7 @@
 - 不实现 API、Provider、Agent、Skill Runtime。
 - 不定义三市场专属业务规则。
 
-## 2. 初始代码位置
+## 2. 契约归属与迁移状态
 
 ```text
 src/loot/contracts/
@@ -38,8 +40,13 @@ src/loot/contracts/
   market_data.py   MarketBar、MarketSnapshot、MarketBarClosedEvent
   portfolio.py     WatchItem、TradingPlan、Position、PositionEvent
   monitoring.py    MonitoringSubscription、CandidateEvent
-  signals.py       EvidenceSet、DecisionTicket、SignalInstance、SignalEvent
+  signals.py       EvidenceSet、DecisionProposal、PolicyEvaluation、
+                   DecisionTicket、SignalInstance、SignalEvent
 ```
+
+上面是目标契约归属。当前 `signals.py` 仍只有旧语义 DecisionTicket；
+DecisionProposal、PolicyEvaluation 和 Policy 后的新 DecisionTicket 将在 REQ-0007
+统一迁移，不能通过增加第二个别名继续混用。
 
 ## 3. 契约原则
 
@@ -78,6 +85,7 @@ src/loot/contracts/
 - volume 不能为负。
 - opened_at、closed_at、received_at 必须是 UTC aware datetime。
 - high/low 必须覆盖 open/close，避免基础行情形态失真。
+- `is_closed=True` 时 received_at 不能早于 closed_at。
 
 `MarketSnapshot` 是一次预筛选或 replay 的行情窗口，要求：
 
@@ -86,7 +94,10 @@ src/loot/contracts/
 - bars 按 opened_at 升序排列。
 - 同一 snapshot 内 provider_event_id 不能重复。
 - `latest_bar` 可能未收盘，策略默认应使用 `latest_closed_bar`。
-- snapshot_key 作为 replay 和幂等输入。
+- snapshot_content_hash 基于 as_of 和完整有序 K 线窗口的 canonical 规范化事实生成。
+- snapshot_key 和 snapshot_id 必须绑定完整窗口内容；不同窗口长度、历史修正或闭合
+  状态变化不得复用 identity。
+- as_of 不能早于任何已收盘 K 线的 closed_at。
 
 `MarketBarClosedEvent` 预留给后续事件总线使用，只允许发布已确认收盘 K 线。
 
@@ -111,9 +122,47 @@ CLOSE
 - 每个事件必须携带 `idempotency_key`。
 - 写入后不可更新或删除。
 
-### 4.4 DecisionTicket 和 SignalEvent
+### 4.4 DecisionProposal、PolicyEvaluation、DecisionTicket 和 SignalEvent
 
-`DecisionTicket` 是 Decision Skill 输出的待准入决策，必须包含 evidence 引用和 skill 版本。
+`DecisionProposal` 是 Decision Skill 或确定性 Decision Builder 输出的待准入建议，
+必须包含 Candidate、Evidence、Skill/规则版本和输入快照引用。Proposal 不能直接进入
+Signal State Machine。
+
+Proposal 还必须绑定 signal_id、signal_type、expected_signal_version、WatchItem 版本、
+TradingPlan 配置版本、可选 Position 版本和 context_digest，防止审核后上下文变化仍
+应用旧建议。
+
+`PolicyEvaluation` 是 Policy Gate 对 Proposal 的审计结果：
+
+```text
+APPROVED
+REJECTED
+DEFERRED
+```
+
+PolicyEvaluation 使用 evaluation_request_id 做投递幂等，并使用
+`proposal_id + policy_version + evaluation_context_digest` 区分评估事实。
+`DEFERRED` 到期或上下文变化后追加新评估，不能被首次结果永久阻塞。
+
+只有 `APPROVED` 才能签发 `DecisionTicket`。Policy Gate 不得静默修改 Proposal；
+需要改变目标状态或证据时必须生成新的 Proposal。
+
+`DecisionTicket` 是 Policy Gate 签发的已授权迁移凭证，必须包含：
+
+- `proposal_id`、`policy_evaluation_id` 和 `policy_version`。
+- `proposal_digest`，锁定被审核的 Proposal 内容。
+- `authorized_transition`，作为状态机唯一读取的目标状态。
+- 市场、标的、周期、Signal 和输入快照身份。
+- `expected_signal_version`、业务上下文版本和 `context_digest`。
+- `issued_at`、`expires_at` 和稳定 `dedupe_key`。
+
+Ticket 写入后不可修改，过期 Ticket 不能改变 Signal。同一 Proposal 整个生命周期最多
+签发一张 Ticket。状态机必须从事实源校验 APPROVED PolicyEvaluation、proposal_digest
+和上下文版本，不能仅信任调用方构造的 Ticket。
+
+`SignalInstance` 初始化时 `latest_decision_ticket_id` 允许为 null，并携带从 1 开始的
+generation 和稳定 setup_key。终态实例不可重置；新市场结构创建下一代实例。任何投影
+更新都必须重新运行完整契约校验，不能通过不校验的局部复制形成事实状态。
 
 `SignalEvent` 只表达真实状态变化：
 
@@ -135,6 +184,8 @@ py -3.12 -m unittest discover -s tests -p "test_*.py"
 
 - 按持久化设计补数据库表结构和迁移。
 - 为 Signal State Machine 增加合法迁移表。
+- 将当前 Policy 前的 `DecisionTicket` 代码契约迁移为 `DecisionProposal`，再增加
+  Policy 后的新 `DecisionTicket`，禁止两个不同语义共用同名类型。
 - 为 Skill Manifest、SkillRun 和 Guard 输出补契约。
 - 为 MarketBarClosedEvent 补事件信封映射和持久化幂等键。
 - 增加 JSON Schema 导出，服务 API 和事件消费者共享。

@@ -22,14 +22,28 @@ Loot 是面向个人自选与手动持仓的多市场信号监控系统，覆盖
 
 1. 三个市场是独立 bounded context，分别拥有数据、信息、规则、Agent、Skills、Policy 和 Signal State Machine。
 2. 市场路由必须是确定性的，不能交给大模型决定。
-3. Agent 只能选择分析路径和编排已授权 Skills，不能直接改变 Signal 状态、修改持仓或发送交易指令。
+3. Agent 只能选择分析路径、编排已授权 Skills 并生成 DecisionProposal，不能直接创建
+   DecisionTicket、改变 Signal 状态、修改持仓或发送交易指令。
 4. Skill 必须具有强类型输入输出、版本、市场范围、超时和权限声明。
-5. Policy Gate 不可绕过；Signal State Machine 是信号状态的唯一写入入口。
+5. Policy Gate 不可绕过；它必须记录 PolicyEvaluation，只有批准时才能签发
+   DecisionTicket；Signal State Machine 负责初始 OBSERVING Signal 的幂等创建，并且只
+   消费已授权 Ticket 执行后续迁移，是信号状态的唯一写入入口。
 6. 自选和持仓由用户手动维护。持仓变化必须追加 PositionEvent，不能通过覆盖历史掩盖操作过程。
 7. PostgreSQL 是业务状态事实源；Redis 只承担缓存、锁和事件流。
 8. 所有消费者按至少一次投递设计，必须实现幂等。
 9. 内部时间统一使用 UTC，展示层转换为市场或用户时区。
 10. V1 不实现自动交易、券商同步、全市场扫描或高频交易。
+11. MarketSnapshot identity 必须绑定完整有序输入窗口内容；不同窗口、历史修正或闭合
+    状态变化不得复用 snapshot_id。
+12. `is_closed=True` 的 MarketBar 必须满足 `received_at >= closed_at`，PreFilter 不得
+    消费时间上尚未闭合的 K 线。
+13. Signal State Machine 必须通过事实仓库端口验证 APPROVED PolicyEvaluation、
+    proposal_digest、Ticket 有效期和业务上下文版本；生产实现以 PostgreSQL 为事实源，
+    Phase 0 测试可用内存适配器，但不能只信任调用方构造的 Ticket。
+14. Signal 投影更新必须重新运行完整契约校验，禁止用跳过 validator 的局部复制写入
+    事实状态；相同 Ticket ID 但 payload 不同必须按冲突拒绝。
+15. 初始 Signal 的 latest_decision_ticket_id 为空；终态后以新 generation 创建下一轮
+    SignalInstance，禁止重置或覆盖旧实例。
 
 ## Module Boundaries
 
@@ -50,6 +64,8 @@ Codex 实现功能前必须：
 5. 为事件消费、状态转换和人工 PositionEvent 增加幂等处理。
 6. 为市场规则添加单元测试，为跨模块闭环添加集成或 Replay 测试。
 7. 如果实现与文档不同，同一变更中更新设计文档。
+8. 涉及 Policy 或 Signal 迁移时，显式列出输入快照、Signal、WatchItem、TradingPlan
+   和 Position 的版本绑定与过期处理。
 
 ## Context Closeout
 
@@ -69,7 +85,8 @@ Codex 实现功能前必须：
 - API、事件、数据表和状态迁移一致。
 - Agent 无法绕过 Skill、Policy Gate 和 Signal State Machine。
 - 重试不会产生重复状态或重复提醒。
-- 核心路径具有可追踪的 correlation_id、skill_run_id 和 input_snapshot_id。
+- 核心路径具有可追踪的 correlation_id、input_snapshot_id、skill_run_id、
+  decision_proposal_id、policy_evaluation_id 和 decision_ticket_id。
 - 至少覆盖成功、拒绝、重复投递、依赖失败和恢复路径。
 - 文档、迁移、测试和实现保持同步。
 - 上下文入口、memory、相关设计文档和 runbook 没有过期链接或明显矛盾。

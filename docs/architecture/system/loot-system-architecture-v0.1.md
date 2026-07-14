@@ -5,6 +5,7 @@
 | 状态 | Proposed |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
+| 最后设计回归 | 2026-07-14 |
 | 适用范围 | V1：个人自选与手动持仓监控 |
 | 目标读者 | Codex、开发者、架构评审者 |
 
@@ -53,6 +54,10 @@ V1 明确不做：
 7. **At-Least-Once and Idempotent**：事件允许重复投递，业务处理必须幂等。
 8. **Replayability**：每个决策必须能还原数据、规则和Skill版本。
 9. **Build a Modular Monolith First**：代码一体、进程隔离，不提前拆微服务。
+10. **Content-Addressed Inputs**：MarketSnapshot identity 必须绑定完整输入窗口内容，
+    不能只绑定最新一条数据。
+11. **Persisted Authorization Proof**：状态机必须从事实源验证 Policy 授权链和上下文
+    版本，不能信任调用方构造的 Ticket。
 
 ## 4. System Context
 
@@ -138,10 +143,12 @@ Provider
 → Market Snapshot
 → Deterministic PreFilter
 → Context Builder
-→ Market Agent
-→ Skill Runtime
-→ Decision Skill
+→ Deterministic Analyzer / Market Agent
+→ Skill Runtime / Versioned Rules
+→ Decision Builder / Decision Skill
+→ Decision Proposal
 → Policy Gate
+→ Decision Ticket
 → Signal State Machine
 → Signal Event
 ```
@@ -159,7 +166,8 @@ Provider
 - 投递重试
 - 已读、忽略和用户反馈
 
-该层不能重新解释市场业务，也不能推翻 Market Domain 的Decision Ticket。
+该层不能重新解释市场业务，也不能推翻 Market Domain 经 Policy Gate 授权的
+DecisionTicket。
 
 ### 5.5 Data Platform
 
@@ -237,7 +245,7 @@ Agent 不可以：
 |---|---|---|
 | Analysis Skill | 生成结构化Evidence | breakout_assessment |
 | Information Skill | 提取、归因和映射信息事件 | announcement_impact |
-| Decision Skill | 将Evidence组合为Decision Ticket | position_exit_decision |
+| Decision Skill | 将Evidence组合为DecisionProposal | position_exit_decision |
 | Guard Skill | 强制数据、市场和风险约束 | actionability_guard |
 
 Agent可调用Skill保持中等粒度。ATR、Pivot和统计函数放在Skill内部，不全部暴露为Agent工具。
@@ -265,12 +273,19 @@ timeout_ms: 1000
 Market Agent
 → SkillRun
 → EvidenceSet
-→ DecisionTicket
+→ DecisionProposal
 → Policy Gate
+→ PolicyEvaluation
+→ DecisionTicket
 → Signal State Machine
 ```
 
-只有最后一步能改变SignalInstance状态。
+DecisionProposal 只是建议；Policy Gate 无论批准、拒绝还是延后都要记录
+PolicyEvaluation，只有批准时才签发 DecisionTicket。只有最后一步能改变
+SignalInstance 状态。
+
+PolicyEvaluation 是不可变评估事实。相同评估请求幂等返回；DEFERRED 到期或上下文
+变化后追加新评估。一个 Proposal 整个生命周期最多签发一张 DecisionTicket。
 
 ## 8. Core Contracts
 
@@ -334,7 +349,7 @@ TradingPlan 取消属于 TradingPlan 生命周期事件，不进入 PositionEven
 
 包含Skill输出的结构化证据、质量、观测时间、过期时间和输入快照引用。
 
-### 8.7 DecisionTicket
+### 8.7 DecisionProposal
 
 至少包含：
 
@@ -350,7 +365,31 @@ TradingPlan 取消属于 TradingPlan 生命周期事件，不进入 PositionEven
 - input_snapshot_id
 - decision_summary
 
-### 8.8 SignalEvent
+DecisionProposal 可以由 Decision Skill 或确定性 Decision Builder 产生，但不能直接
+进入状态机。
+
+### 8.8 PolicyEvaluation 和 DecisionTicket
+
+PolicyEvaluation 记录 Proposal 的批准、拒绝或延后结果及 Guard 明细。只有批准结果
+才能签发 DecisionTicket。
+
+DecisionTicket 至少包含：
+
+- proposal_id 和 policy_evaluation_id
+- policy_version 和 proposal_digest
+- market、instrument、timeframe 和 signal_id
+- authorized_transition
+- actionability 和 position_impact
+- input_snapshot_id
+- expected_signal_version、业务上下文版本和 context_digest
+- issued_at 和 expires_at
+- dedupe_key
+
+DecisionTicket 是 Policy Gate 之后的不可变授权凭证，只能由 Policy Gate 创建。状态机
+必须通过事实仓库端口核验 APPROVED PolicyEvaluation、proposal_digest 和上下文版本；
+生产适配器使用 PostgreSQL。
+
+### 8.9 SignalEvent
 
 跨领域统一输出：
 
@@ -394,7 +433,9 @@ alert.events
 - market.info_event_detected
 - market.candidate_detected
 - skill.run_completed
-- decision.ticket_created
+- decision.proposal_created
+- decision.policy_evaluated
+- decision.ticket_issued
 - signal.state_changed
 - alert.requested
 - alert.delivered
@@ -414,10 +455,11 @@ flowchart TD
     C --> A["Market Agent选择Skills"]
     A --> R["Skill Runtime"]
     R --> V["Evidence Set"]
-    V --> D["Decision Ticket"]
+    V --> D["Decision Proposal"]
     D --> G{"Policy Gate通过？"}
-    G -- "否" --> X["拒绝・降级・复查"]
-    G -- "是" --> S["Signal State Machine"]
+    G -- "否" --> X["PolicyEvaluation：拒绝或延后"]
+    G -- "是" --> K["PolicyEvaluation + DecisionTicket"]
+    K --> S["Signal State Machine"]
     S --> T{"状态变化？"}
     T -- "否" --> W
     T -- "是" --> B["Signal Event"]
@@ -447,7 +489,8 @@ observability
 - 金额、成本和持仓数量使用Decimal/NUMERIC语义。
 - 大规模K线分析字段可使用DOUBLE PRECISION或缩放整数。
 - JSONB只承载有版本的扩展Payload，不替代核心关系字段。
-- Signal、DecisionTicket、SkillRun和PositionEvent保留不可变历史。
+- Signal、DecisionProposal、PolicyEvaluation、DecisionTicket、SkillRun 和
+  PositionEvent 保留不可变历史。
 - Position等投影使用乐观锁version字段。
 - 所有软删除记录保留审计信息。
 
@@ -515,10 +558,16 @@ V1的核心是可控Skill、Policy和状态机，而不是复杂长流程Agent�
 
 - Provider断线：重连、补拉缺口、数据质量标记。
 - 乱序或重复行情：按provider_event_id和时间桶幂等。
+- Snapshot identity 冲突：完整窗口内容不同必须形成不同 content hash 和 snapshot_id。
+- 提前闭合 K 线：`is_closed=True` 但 received_at 早于 closed_at 时拒绝。
 - Skill超时：记录FAILED，降级为确定性结果或安排复查。
 - LLM失败：不能阻断基础技术信号；标记解释或信息增强缺失。
 - Redis重复消息：消费者使用event_id和业务dedupe_key。
-- Policy拒绝：保留DecisionTicket和拒绝原因。
+- Policy 拒绝或延后：保留 DecisionProposal、PolicyEvaluation 和原因，不签发
+  DecisionTicket。
+- Policy 延后重评：使用新的 evaluation context 追加评估，不覆盖首次结果。
+- Ticket 过期：状态机拒绝迁移并记录审计结果。
+- Ticket 授权链或上下文版本不一致：拒绝迁移并记录安全审计。
 - 通知失败：独立重试，不回滚Signal状态。
 - 数据缺失：Guard阻止高置信度Signal。
 
@@ -529,7 +578,10 @@ V1的核心是可控Skill、Policy和状态机，而不是复杂长流程Agent�
 - correlation_id
 - causation_id
 - input_snapshot_id
+- snapshot_content_hash
 - skill_run_id
+- decision_proposal_id
+- policy_evaluation_id
 - decision_ticket_id
 - signal_id
 - alert_id
@@ -552,6 +604,8 @@ Replay Engine 使用历史MarketSnapshot、Skill版本和Policy版本重放：
 
 - Candidate是否正确生成
 - Evidence是否一致
+- DecisionProposal是否稳定
+- PolicyEvaluation和DecisionTicket是否符合Policy版本
 - Signal状态迁移是否合法
 - Alert是否重复
 - 规则变化前后结果差异
@@ -642,7 +696,8 @@ Loot/
 1. 市场领域独立，不能退化为一个通用MarketPolicy。
 2. Agent不拥有Signal最终写权限。
 3. Agent-callable Skill保持中等粒度。
-4. 状态机只接受通过Policy Gate的DecisionTicket。
+4. 状态机负责初始 OBSERVING Signal 和终态后新 generation 的幂等创建，后续迁移只
+   接受通过 Policy Gate 且持久化授权链、上下文版本校验通过的 DecisionTicket。
 5. 通知失败不回滚Signal。
 6. 人工持仓操作追加记录。
 7. V1不为未来规模预先引入Kafka、Kubernetes或自动交易。
