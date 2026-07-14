@@ -31,6 +31,12 @@
 
 - 本地运行说明：[runbooks/local-run.md](runbooks/local-run.md)
 - 上下文健康检查：[runbooks/context-health-check.md](runbooks/context-health-check.md)
+- 同步项目 Skills：[runbooks/sync-project-skills.md](runbooks/sync-project-skills.md)
+
+## 项目 Skills
+
+- Skills 索引：[skills/README.md](skills/README.md)
+- Vibe Context Manager：[skills/vibe-context-manager/SKILL.md](skills/vibe-context-manager/SKILL.md)
 
 ## 需求与计划
 
@@ -48,6 +54,7 @@ docs/
   planning/       需求、计划和季度总览按 yyyy-Qn 归档并显式命名
   reviews/        设计评审和阶段结论按 yyyy-Qn 归档
   runbooks/       本地运行、测试、排障手册
+  skills/         可随 Git 多端同步的项目级 Codex skills
 ```
 
 ## 分层原则
@@ -58,6 +65,7 @@ docs/
 - `development/log` 记录一次功能推进中的判断过程、证据、改动和验证。
 - `reviews` 记录阶段校对结论，避免设计债和实现债散落在聊天里。
 - `runbooks` 记录可复用操作步骤，避免每次从设计文档里翻命令。
+- `skills` 保存项目权威 skill，设备级 `$CODEX_HOME/skills` 只是安装镜像。
 - 时间型资料进入 `yyyy-Qn/`；季度总览、需求管理和开发计划文件名必须包含季度标记。
 
 ## 上下文维护规则

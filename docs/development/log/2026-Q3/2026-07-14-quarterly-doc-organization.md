@@ -29,6 +29,7 @@ Loot 的 architecture、development log、planning、reviews 和 runbooks 已经
 - 需求与计划重命名为 `需求管理-2026-Q3.md`、`开发计划-2026-Q3.md`。
 - 三个时间型目录根 `README.md` 只做跨季度导航。
 - 更新 docs 入口、memory、AGENTS、runbook 和全局 `vibe-context-manager`。
+- 将 `vibe-context-manager` 权威副本纳入 `docs/skills/`，并提供多端同步 runbook。
 
 ## 验证
 

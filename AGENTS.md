@@ -9,6 +9,17 @@
 5. 与任务相关的 `docs/architecture/*/*.md` 或
    `docs/development/log/<yyyy-Qn>/*.md`
 
+涉及项目上下文整理、季度归档或文档分层时，还必须阅读：
+
+6. `docs/skills/vibe-context-manager/SKILL.md`
+
+## Project Skill Source
+
+- `docs/skills/vibe-context-manager/SKILL.md` 是 Loot 的权威 skill 副本。
+- `$CODEX_HOME/skills/vibe-context-manager` 只是设备级安装镜像。
+- skill 变更先修改项目副本，再按 `docs/runbooks/sync-project-skills.md` 同步本机。
+- 禁止多台设备分别维护不同的本机版本而不回写项目副本。
+
 ## Project Definition
 
 Loot 是面向个人自选与手动持仓的多市场信号监控系统，覆盖：

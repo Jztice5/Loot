@@ -63,6 +63,13 @@ git diff --cached --check
 - 命令真实执行过，或明确标记为计划。
 - 运行说明和当前项目阶段一致。
 
+### 6.1 Project Skills 健康
+
+- `docs/skills/README.md` 指向项目内权威 skill。
+- 项目 skill 通过 validator。
+- 本机需要使用该 skill 时，项目副本与 `$CODEX_HOME/skills` 镜像哈希一致。
+- 安装和同步操作能从 `docs/runbooks/sync-project-skills.md` 复现。
+
 ### 7. AGENTS 健康
 
 - `AGENTS.md` 中要求阅读的路径真实存在。

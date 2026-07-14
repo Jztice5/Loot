@@ -20,6 +20,8 @@
 - 当前需求管理：`docs/planning/2026-Q3/需求管理-2026-Q3.md`。
 - 当前上下文维护机制：`docs/README.md` 作为入口，`development/memory.md` 记录状态，`development/log` 记录过程，`reviews` 记录阶段结论，`runbooks` 记录可执行步骤。
 - 时间型资料按 `yyyy-Qn` 归档；季度总览、需求管理和开发计划文件名显式带季度标记。
+- 项目级 `vibe-context-manager` 权威副本位于
+  `docs/skills/vibe-context-manager/SKILL.md`，通过 Git 支持多端同步。
 
 ## 设计主线
 
