@@ -1,5 +1,10 @@
 # Loot 上下文文档季度化评审
 
+> 状态：Superseded（部分规则已被取代）
+>
+> `superseded_by`：[动态上下文单一事实源评审](context-source-simplification-review-2026-07-14.md)。
+> 本文保留为历史记录；其中“每季度必须维护开发计划”的规则不再适用。
+
 ## 1. 评审范围
 
 - development log、planning 和 reviews 的目录规模。

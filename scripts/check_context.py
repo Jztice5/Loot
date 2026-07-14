@@ -17,6 +17,17 @@ QUARTER_PATTERN = re.compile(r"^\d{4}-Q[1-4]$")
 DATE_PREFIX_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 DATE_SUFFIX_PATTERN = re.compile(r"^.+-\d{4}-\d{2}-\d{2}\.md$")
 LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+REQUIREMENT_HEADING_PATTERN = re.compile(r"^### (REQ-\d+)[：:].*$", re.MULTILINE)
+REQUIREMENT_STATE_PATTERN = re.compile(
+    r"^状态：(Planned|In Progress|Blocked|Done|Rejected|Superseded|Deferred)\s*$",
+    re.MULTILINE,
+)
+QUEUE_SECTION_PATTERN = re.compile(
+    r"^## 阶段与执行队列\s*$\n(.*?)(?=^## |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+QUEUE_ROW_PATTERN = re.compile(r"^\|\s*\d+\s*\|\s*`(REQ-\d+)`", re.MULTILINE)
+QUEUED_REQUIREMENT_STATES = {"Planned", "In Progress", "Blocked"}
 IGNORED_PARTS = {".git", ".venv", "node_modules", "build", "dist"}
 
 REQUIRED_PATHS = (
@@ -117,6 +128,76 @@ def check_dynamic_source_boundaries(report: Report) -> None:
                 "planning overview duplicates volatile requirement state: "
                 f"{overview.relative_to(ROOT)}"
             )
+
+
+def check_requirement_queue_content(report: Report, label: str, content: str) -> None:
+    matches = list(REQUIREMENT_HEADING_PATTERN.finditer(content))
+    states: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        requirement_id = match.group(1)
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        section = content[match.end() : section_end]
+        state_match = REQUIREMENT_STATE_PATTERN.search(section)
+        if requirement_id in states:
+            report.error(f"duplicate requirement heading in {label}: {requirement_id}")
+            continue
+        if state_match is None:
+            report.error(f"requirement has no recognized state in {label}: {requirement_id}")
+            continue
+        states[requirement_id] = state_match.group(1)
+
+    queue_section_match = QUEUE_SECTION_PATTERN.search(content)
+    if queue_section_match is None:
+        report.error(f"missing requirement queue section in {label}")
+        queue = []
+    else:
+        queue = QUEUE_ROW_PATTERN.findall(queue_section_match.group(1))
+    duplicate_queue_ids = sorted(
+        requirement_id for requirement_id in set(queue) if queue.count(requirement_id) > 1
+    )
+    if duplicate_queue_ids:
+        report.error(
+            f"duplicate requirement queue entries in {label}: {', '.join(duplicate_queue_ids)}"
+        )
+
+    expected = {
+        requirement_id
+        for requirement_id, state in states.items()
+        if state in QUEUED_REQUIREMENT_STATES
+    }
+    actual = set(queue)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        details = []
+        if missing:
+            details.append(f"missing={','.join(missing)}")
+        if extra:
+            details.append(f"extra={','.join(extra)}")
+        report.error(f"requirement queue/status mismatch in {label}: {' '.join(details)}")
+
+    in_progress = sorted(
+        requirement_id for requirement_id, state in states.items() if state == "In Progress"
+    )
+    if len(in_progress) > 1:
+        report.error(
+            f"multiple In Progress requirements in {label}: {', '.join(in_progress)}"
+        )
+
+
+def check_current_requirement_queue(report: Report) -> None:
+    planning_quarters = quarter_directories(ROOT / "docs/planning")
+    if not planning_quarters:
+        return
+    current_quarter = max(planning_quarters, key=lambda path: path.name)
+    requirements_path = current_quarter / f"需求管理-{current_quarter.name}.md"
+    if not requirements_path.exists():
+        return
+    check_requirement_queue_content(
+        report,
+        str(requirements_path.relative_to(ROOT)),
+        requirements_path.read_text(encoding="utf-8"),
+    )
 
 
 def check_local_links(report: Report, files: list[Path]) -> int:
@@ -294,6 +375,7 @@ def main() -> int:
     check_root_readme(report)
     check_temporal_context_model(report)
     check_dynamic_source_boundaries(report)
+    check_current_requirement_queue(report)
     links_checked = check_local_links(report, files)
     check_quarter_layout(report)
     memory_lines, skill_lines = check_size_budgets(report)

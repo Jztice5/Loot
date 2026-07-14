@@ -30,8 +30,9 @@
 
 - 项目 Skill 与全局 Codex 镜像均通过 validator，SHA-256 一致。
 - `make check` 通过：context check、`compileall` 和 41 个 unittest 全部成功。
-- context check 统计 45 个 Markdown 文件、116 个本地链接，memory 由 105 行降至 48 行。
-- 自动检查会拒绝季度流水式开发计划和历史 log 的动态计划标题。
+- context check 统计 45 个 Markdown 文件、118 个本地链接，memory 由 105 行降至 48 行。
+- 自动检查会拒绝季度流水式开发计划、历史 log 的动态计划标题、队列与需求状态不一致、
+  重复队列项和多个 In Progress 需求。
 - 人工扫描未发现 memory、规划总览或独立开发计划复制完整需求队列。
 
 ## 5. 一句话结论

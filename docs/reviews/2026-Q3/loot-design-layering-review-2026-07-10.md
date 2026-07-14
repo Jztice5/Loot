@@ -1,5 +1,10 @@
 # Loot 设计分层校对备忘录
 
+> 状态：Superseded（部分规则已被取代）
+>
+> `superseded_by`：[动态上下文单一事实源评审](context-source-simplification-review-2026-07-14.md)。
+> 本文保留为历史记录；完整未完成清单和计划队列不再进入 memory。
+
 ## 1. 校对范围
 
 - 参考项目：`D:\YLWX-project\PythonProject\docs`。

@@ -30,6 +30,8 @@ Windows PowerShell：
 - planning、development log 和 reviews 的季度目录、文件命名及总览登记。
 - memory、规划总览和历史 log 是否越界复制需求队列或动态计划标题。
 - 季度目录是否重新引入流水式开发计划。
+- 当前季度执行队列是否与 Planned、In Progress、Blocked 需求完全一致、没有重复，并且
+  最多只有一个 In Progress。
 - `memory.md` 和项目 Skill 是否超过加载预算。
 - 项目 Skill 与已安装的全局镜像是否一致。
 - Markdown、检查脚本、Makefile 和 pyproject 中的尾随空白与文件末尾换行。

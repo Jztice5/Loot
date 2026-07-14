@@ -85,6 +85,8 @@ flowchart LR
 7. 归档季度的业务结论不覆盖改写；修正通过新记录、勘误或 superseded_by 表达。
 8. architecture 和 runbook 变化时同步更新受影响的现在与未来上下文入口。
 9. 三类上下文转换是语义和状态迁移，不要求在目录之间移动同一份需求文档。
+10. 当前季度执行队列必须与 Planned、In Progress、Blocked 需求集合一致，不得重复；同一
+    时间最多一个需求处于 In Progress。
 
 ## 5. Loot 映射示例
 
