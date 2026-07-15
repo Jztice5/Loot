@@ -20,6 +20,7 @@ from pydantic import Field, field_validator, model_validator
 from loot.contracts.base import ContractModel, ensure_non_empty, ensure_utc_datetime
 from loot.contracts.enums import (
     CandidateType,
+    Direction,
     Market,
     MonitoringSubscriptionStatus,
     Priority,
@@ -80,12 +81,13 @@ class CandidateEvent(ContractModel):
         PreFilter -> CandidateEvent -> Market Agent -> Skill Runtime -> EvidenceSet
 
     业务规则:
-        trigger_reason、suggested_skill_group 和 dedupe_key 不能为空；
-        expires_at 必须晚于 occurred_at。
+        direction 必须显式表达市场判断；trigger_reason、suggested_skill_group 和
+        dedupe_key 不能为空；expires_at 必须晚于 occurred_at。
     """
 
     id: UUID
     candidate_type: CandidateType
+    direction: Direction
     trigger_reason: str
     snapshot_id: UUID
     watch_item_id: UUID

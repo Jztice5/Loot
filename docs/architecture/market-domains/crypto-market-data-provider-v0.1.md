@@ -251,11 +251,9 @@ latest_closed_same= True
 
 ## 8. 后续扩展
 
-下一步建议：
+Golden Case 和 `CryptoStructurePreFilter` 已分别由 REQ-0006、REQ-0005 完成。后续建议：
 
-1. 建立 Crypto 第一批 Golden Case，固定输入和候选预期。
-2. 增加 `FakeCryptoPreFilter`，从 `MarketSnapshot.latest_closed_bar` 产生 `CandidateEvent`。
-3. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
-4. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
-5. 再进入 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine
+1. 将 `MarketBarClosedEvent` 接入事件消费者和幂等账本。
+2. 为 OKX Provider 增加历史缺口补拉和数据质量标记。
+3. 进入 DecisionProposal、PolicyEvaluation、DecisionTicket 和 Signal State Machine
    闭环。

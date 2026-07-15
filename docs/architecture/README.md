@@ -23,6 +23,7 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 - [Loot 核心契约设计文档 V0.1](./contracts/loot-contracts-v0.1.md)
 - [Loot 决策运行时与授权链路设计 V0.1](./runtime/decision-flow-v0.1.md)
 - [Loot Crypto 行情数据 Provider 设计文档 V0.1](./market-domains/crypto-market-data-provider-v0.1.md)
+- [Loot Crypto Structure PreFilter V0.1](./market-domains/crypto-prefilter-v0.1.md)
 - [Loot Crypto Golden Cases V0.1](./testing/crypto-golden-cases-v0.1.md)
 - [Loot 自选与持仓信号监控闭环设计文档 V0.1](./signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - [Loot Signal State Machine 设计文档 V0.1](./signal-state-machine/loot-signal-state-machine-v0.1.md)
@@ -31,6 +32,6 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 后续建议增加：
 
 - `architecture/skill-runtime/`：Skill Manifest、注册、执行、审计、超时和 allowlist 设计。
-- `architecture/market-domains/`：当前继续补 Crypto PreFilter；Crypto 闭环复盘后再分别
-  设计 US Equity 和 A-Share 的领域规则。
+- `architecture/market-domains/`：Crypto Provider 和 PreFilter 已完成，当前继续推进
+  Candidate 到 Signal 授权链路；Crypto 闭环复盘后再分别设计 US Equity 和 A-Share。
 - `architecture/replay/`：Golden Case、Replay Engine 和评测口径设计。

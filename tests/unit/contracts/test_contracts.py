@@ -15,6 +15,7 @@ from loot.contracts import (
     CandidateEvent,
     CandidateType,
     DecisionTicket,
+    Direction,
     EventEnvelope,
     EvidenceSet,
     ExitMode,
@@ -200,6 +201,7 @@ class ContractModelTest(unittest.TestCase):
             CandidateEvent(
                 id=uuid4(),
                 candidate_type=CandidateType.PRICE_ZONE_APPROACH,
+                direction=Direction.LONG,
                 trigger_reason="Near resistance",
                 snapshot_id=uuid4(),
                 watch_item_id=uuid4(),

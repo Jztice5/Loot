@@ -467,7 +467,7 @@ src/loot/notifications/          Alert Policy 和 Notifier
 
 1. 已完成：修复 Snapshot 身份、闭合时间和状态机投影校验等已复现地基问题。
 2. 固化 LONG、SHORT 成对的 Crypto Golden Case 输入和预期。
-3. 实现只读取 `latest_closed_bar`、显式输出 direction 的 Crypto PreFilter。
+3. 已完成：实现只读取已收盘 K 线、显式输出 direction 的 Crypto PreFilter。
 4. 实现 OBSERVING SignalInstance 的幂等初始化和 generation 规则。
 5. 将现有 Policy 前的 `DecisionTicket` 契约迁移为 `DecisionProposal`。
 6. 增加可重评的 `PolicyEvaluation` 和最小 Policy Gate。

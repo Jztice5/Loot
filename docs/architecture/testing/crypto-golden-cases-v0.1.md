@@ -85,7 +85,7 @@ JSON 固定业务可读的 OHLCV、闭合状态和预期；加载器使用 FakeC
 
 ## 6. 后续消费约束
 
-- REQ-0005 必须直接参数化复用这些案例，不能复制一套新的测试 K 线。
-- PreFilter 输出必须与 `candidate_type`、`direction` 和 snapshot_id 预期一致。
-- PreFilter dedupe_key 必须在同一案例重复处理时保持稳定，并包含 direction。
+- REQ-0005 已直接参数化复用这些案例，没有复制测试 K 线。
+- PreFilter 输出已与 `candidate_type`、`direction`、reason_code 和 snapshot_id 预期对齐。
+- PreFilter dedupe_key 在同一案例重复处理时保持稳定，并包含 direction。
 - 如果业务规则变化，新增 fixture schema 或规则版本；不得静默改写旧预期。
