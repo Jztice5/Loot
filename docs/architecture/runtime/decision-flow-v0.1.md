@@ -161,6 +161,7 @@ market
 instrument_id
 timeframe
 signal_type
+direction
 signal_id
 suggested_transition
 evidence_refs
@@ -187,8 +188,9 @@ dedupe_key
 - CandidateType 到 SignalType 的映射由 Market Domain 确定性规则完成；一个 Candidate
   可以形成多个 Proposal，但每个 Proposal 只能指向一个明确的 signal_id 和
   signal_type。
-- `dedupe_key` 至少绑定 Candidate、signal_id、expected_signal_version、规则版本、
-  目标状态和 context_digest。
+- `dedupe_key` 至少绑定 Candidate、direction、signal_id、expected_signal_version、
+  规则版本、目标状态和 context_digest。
+- direction 必须与 Candidate、Evidence 和目标 Signal 一致；Policy 不能改写方向。
 - Proposal 写入后不可修改；修正必须产生新 Proposal。
 - Deterministic Builder 也必须写明 `rule_version`，不能用“没有模型”代替版本管理。
 
@@ -239,6 +241,7 @@ proposal_digest
 market
 instrument_id
 timeframe
+direction
 signal_id
 authorized_transition
 actionability
@@ -258,6 +261,8 @@ dedupe_key
 
 - Ticket 只能引用 outcome 为 `APPROVED` 的 PolicyEvaluation。
 - `proposal_digest` 锁定审核时的 Proposal 内容，防止审核后替换字段。
+- direction 必须包含在 proposal_digest 和 Ticket payload 中，状态机必须验证它与目标
+  Signal 一致。
 - 状态机必须通过事实仓库端口核对 PolicyEvaluation 为 `APPROVED`，并校验
   proposal_digest、policy_version 和上下文版本；生产使用 PostgreSQL，不能仅信任
   调用方传入的对象。
@@ -275,6 +280,10 @@ dedupe_key
 MarketSnapshot -> Candidate -> Evidence -> Proposal -> Signal
 Position       -> Policy 上下文 / 优先级 / Alert 语义
 ```
+
+Crypto 方向同样属于市场事实链：向上结构突破为 LONG，向下结构跌破为 SHORT，无方向
+事件为 NEUTRAL。TradingPlan.direction 和 PositionSide 可以影响可操作性，但不能改写
+Candidate.direction。现货 SHORT 只表达市场判断，不自动获得做空能力。
 
 V0.1 Crypto `STRUCTURE_BREAKOUT` Golden Case 不读取 Position。Position 可以影响：
 
@@ -332,7 +341,7 @@ snapshot_id
 建议唯一键：
 
 ```text
-(market, instrument_id, timeframe, candidate_type, dedupe_key)
+(market, instrument_id, timeframe, candidate_type, direction, dedupe_key)
 ```
 
 ### 9.2 Signal 初始化事务
@@ -351,7 +360,7 @@ snapshot_id
 - Signal 到达 INVALIDATED、RESOLVED 或 EXPIRED 后，新 setup_key 可以通过状态机
   初始化下一代 OBSERVING Signal；Agent、Skill 和 PreFilter 仍不能直接创建。
 - 建议唯一键为
-  `(watch_item_id, market, instrument_id, timeframe, signal_type, generation)`。
+  `(watch_item_id, market, instrument_id, timeframe, signal_type, direction, generation)`。
 
 ### 9.3 Evidence 与 Proposal 事务
 
@@ -419,14 +428,15 @@ outbox(event_id)
 
 Golden Case 是可执行业务定义，应先于 PreFilter 实现。第一批 Crypto 样例固定为：
 
-1. 普通上涨但未突破，不产生 Candidate。
-2. 已收盘 K 线确认突破，产生 `STRUCTURE_BREAKOUT` Candidate。
-3. 未收盘 K 线盘中突破，不产生 Candidate。
-4. 同一快照重复处理，Candidate dedupe_key 稳定。
-5. Policy 拒绝 Proposal，不产生 DecisionTicket 和 SignalEvent。
-6. Policy DEFERRED 到期且上下文变化后，可以追加新的评估结果。
-7. 同一 DecisionTicket 重复消费，只产生一次 SignalEvent。
-8. 相同 Ticket ID 但 payload 指纹不同，必须按冲突拒绝。
+1. 区间内普通上涨或下跌但未突破，不产生 Candidate。
+2. 已收盘 K 线向上突破，产生 `STRUCTURE_BREAKOUT + LONG` Candidate。
+3. 已收盘 K 线向下跌破，产生 `STRUCTURE_BREAKOUT + SHORT` Candidate。
+4. 未收盘 K 线盘中突破后回到区间，不产生 Candidate。
+5. 同一快照和方向重复处理，Candidate dedupe_key 稳定；方向不同不得复用 identity。
+6. Policy 拒绝 Proposal，不产生 DecisionTicket 和 SignalEvent。
+7. Policy DEFERRED 到期且上下文变化后，可以追加新的评估结果。
+8. 同一 DecisionTicket 重复消费，只产生一次 SignalEvent。
+9. 相同 Ticket ID 但 payload 指纹不同，必须按冲突拒绝。
 
 最小 Replay 路径：
 
@@ -456,8 +466,8 @@ src/loot/notifications/          Alert Policy 和 Notifier
 ## 13. 实施顺序
 
 1. 已完成：修复 Snapshot 身份、闭合时间和状态机投影校验等已复现地基问题。
-2. 固化 Crypto Golden Case 输入和预期。
-3. 实现只读取 `latest_closed_bar` 的 Crypto PreFilter。
+2. 固化 LONG、SHORT 成对的 Crypto Golden Case 输入和预期。
+3. 实现只读取 `latest_closed_bar`、显式输出 direction 的 Crypto PreFilter。
 4. 实现 OBSERVING SignalInstance 的幂等初始化和 generation 规则。
 5. 将现有 Policy 前的 `DecisionTicket` 契约迁移为 `DecisionProposal`。
 6. 增加可重评的 `PolicyEvaluation` 和最小 Policy Gate。

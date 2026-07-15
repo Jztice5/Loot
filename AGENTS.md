@@ -84,6 +84,15 @@ Loot 是面向个人自选与手动持仓的多市场信号监控系统，覆盖
     事实状态；相同 Ticket ID 但 payload 不同必须按冲突拒绝。
 15. 初始 Signal 的 latest_decision_ticket_id 为空；终态后以新 generation 创建下一轮
     SignalInstance，禁止重置或覆盖旧实例。
+16. Crypto 方向性分析必须在 Candidate、Proposal、Ticket 和 Signal 链路显式携带
+    `Direction`。`LONG`、`SHORT`、`NEUTRAL` 表达市场判断或计划偏向，不是交易指令；
+    `PositionSide` 只表达用户手工维护的实际持仓。方向必须进入 setup 和幂等身份，
+    Policy 只能判断可操作性，不能改写市场事实方向。
+17. 当前交付采用 Crypto First Vertical Slice。Crypto 从 Provider、Snapshot、Golden Case、
+    PreFilter、Candidate、决策授权、Signal、持久化、Alert 到最小 Replay 的初版闭环未
+    完成验收和复盘前，不实现 US Equity 或 A-Share 的 Provider、领域规则、Agent、
+    Skills、Policy 和 Signal 业务逻辑，也不为尚未验证的跨市场复用提前抽象业务规则。
+    Crypto 闭环稳定后，先提炼已验证的平台能力，再分别启动另外两个 bounded context。
 
 ## Module Boundaries
 

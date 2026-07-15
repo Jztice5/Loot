@@ -57,6 +57,8 @@ DecisionProposal、PolicyEvaluation 和 Policy 后的新 DecisionTicket 将在 R
 - 枚举值使用业务协议中的大写状态或标准周期字符串。
 - 金额、价格、数量和风险倍数使用 `Decimal`。
 - 幂等键、路由键、producer、event_type 等关键文本字段不能为空。
+- `Direction` 的 `LONG`、`SHORT`、`NEUTRAL` 表达市场判断或 TradingPlan 偏向，不代表
+  下单；`PositionSide` 只表达用户手工维护的实际持仓方向。
 
 ## 4. 关键契约
 
@@ -101,7 +103,25 @@ DecisionProposal、PolicyEvaluation 和 Policy 后的新 DecisionTicket 将在 R
 
 `MarketBarClosedEvent` 预留给后续事件总线使用，只允许发布已确认收盘 K 线。
 
-### 4.3 PositionEvent
+### 4.3 CandidateEvent 与方向语义
+
+Crypto 方向性 Candidate 必须包含 `direction: Direction`：
+
+- 上破结构边界使用 `STRUCTURE_BREAKOUT + LONG`。
+- 下破结构边界使用 `STRUCTURE_BREAKOUT + SHORT`。
+- 不表达方向的信息或数据质量候选可以使用 `NEUTRAL`。
+- Candidate `dedupe_key` 必须绑定 direction；相同 Snapshot 上的 LONG 和 SHORT 不能
+  复用身份。
+- TradingPlan.direction 和 PositionSide 可以影响后续 Policy、优先级和提醒语义，
+  但不能改写由市场事实计算出的 Candidate.direction。
+- 现货标的允许形成 SHORT 市场判断；是否可建立空头仓位属于 InstrumentPolicy 和
+  Actionability，不属于 Candidate 的事实判断。
+
+方向性 Evidence 输出、DecisionProposal、DecisionTicket、SignalInstance 和 SignalEvent
+必须保持同一 direction。Policy Gate 可以拒绝、延后或降低可操作性，但不能把 LONG
+改写为 SHORT，反之亦然。
+
+### 4.4 PositionEvent
 
 当前支持：
 
@@ -122,7 +142,7 @@ CLOSE
 - 每个事件必须携带 `idempotency_key`。
 - 写入后不可更新或删除。
 
-### 4.4 DecisionProposal、PolicyEvaluation、DecisionTicket 和 SignalEvent
+### 4.5 DecisionProposal、PolicyEvaluation、DecisionTicket 和 SignalEvent
 
 `DecisionProposal` 是 Decision Skill 或确定性 Decision Builder 输出的待准入建议，
 必须包含 Candidate、Evidence、Skill/规则版本和输入快照引用。Proposal 不能直接进入
@@ -131,6 +151,9 @@ Signal State Machine。
 Proposal 还必须绑定 signal_id、signal_type、expected_signal_version、WatchItem 版本、
 TradingPlan 配置版本、可选 Position 版本和 context_digest，防止审核后上下文变化仍
 应用旧建议。
+
+方向性 Proposal 还必须绑定 direction，并与 Candidate、Evidence 和目标 Signal 一致。
+direction 必须进入 proposal_digest，禁止在 Policy 审核或 Ticket 签发阶段被静默修改。
 
 `PolicyEvaluation` 是 Policy Gate 对 Proposal 的审计结果：
 

@@ -12,6 +12,10 @@
 - [`signal-monitoring/`](./signal-monitoring/)：自选与持仓信号监控闭环设计，描述 WatchItem、TradingPlan、PositionEvent、Market Router、Signal State Machine 和 Alert Loop。
 - [`signal-state-machine/`](./signal-state-machine/)：Signal 状态迁移引擎，描述合法迁移、幂等语义、no-op 和错误类型。
 
+当前实施采用 `Crypto First Vertical Slice`：三市场架构描述是最终边界，不代表并行开发。
+Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场业务与支撑它所必需的平台
+能力；US Equity 和 A-Share 的领域实现进入后续阶段。
+
 当前文档：
 
 - [Loot 系统宏观架构设计文档 V0.1](./system/loot-system-architecture-v0.1.md)
@@ -25,5 +29,6 @@
 后续建议增加：
 
 - `architecture/skill-runtime/`：Skill Manifest、注册、执行、审计、超时和 allowlist 设计。
-- `architecture/market-domains/`：继续补 Crypto PreFilter、US Equity、A-Share 的领域规则和差异化设计。
+- `architecture/market-domains/`：当前继续补 Crypto PreFilter；Crypto 闭环复盘后再分别
+  设计 US Equity 和 A-Share 的领域规则。
 - `architecture/replay/`：Golden Case、Replay Engine 和评测口径设计。

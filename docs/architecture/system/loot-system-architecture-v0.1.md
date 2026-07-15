@@ -5,7 +5,7 @@
 | 状态 | Proposed |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
-| 最后设计回归 | 2026-07-14 |
+| 最后设计回归 | 2026-07-15 |
 | 适用范围 | V1：个人自选与手动持仓监控 |
 | 目标读者 | Codex、开发者、架构评审者 |
 
@@ -18,6 +18,10 @@ V1 的核心架构为：
 > 模块化单体 + 多进程事件驱动 + 三个独立市场领域 + Agent/Skill 受控决策 + 统一信号与提醒平台。
 
 三个市场共享控制面、基础设施、契约和纯量化函数，但各自拥有完整的数据语义、信息链路、Agent、Skills、Policy、风险判断和 Signal State Machine。
+
+交付顺序采用 `Crypto First Vertical Slice`。三市场是最终架构边界，不是当前并行实施
+范围；先用 Crypto 搭建并验证完整初版链路，再从真实实现中提炼共享平台能力，最后分别
+扩展 US Equity 和 A-Share。
 
 ## 2. Goals and Non-Goals
 
@@ -186,6 +190,7 @@ DecisionTicket。
 - 7×24交易Session
 - 多交易所和交易对映射
 - 现货与永续合约
+- LONG、SHORT、NEUTRAL 市场方向判断，以及方向与实际持仓、可操作性的隔离
 - K线、成交量、资金费率、OI和爆仓
 - 杠杆及清算风险
 - 项目事件和链上事件
@@ -663,19 +668,25 @@ Loot/
 - Position和PositionEvent
 - API和基础Dashboard
 
-### Phase 2：First Market Vertical Slice
+### Phase 2：Crypto First Vertical Slice
 
-- Provider
-- K线存储
-- PreFilter
-- Market Agent和Skills
-- Signal到Alert端到端闭环
+- Crypto Provider、K线存储和数据质量
+- Crypto Golden Case、方向特征和 PreFilter
+- Candidate、Evidence、DecisionProposal、PolicyEvaluation 和 DecisionTicket
+- Crypto Signal State Machine、持久化和幂等恢复
+- Market Agent 和受控 Skills 的最小实现
+- Signal 到 Alert 的单渠道端到端闭环
+- 固定 Snapshot 到 Signal/Alert 的最小 Replay
 
-建议优先Crypto验证持续监控价值，但不改变三个领域的架构地位。
+本阶段只允许实现 Crypto 市场业务。为 Crypto 闭环所需的 contracts、runtime、
+persistence 和 alert 可以沉淀在平台层，但不能基于尚未实现的美股或 A 股规则提前设计
+通用市场模型。完成上述链路的验收和复盘，是进入 Phase 3 的强制门禁。
 
 ### Phase 3：US Equity and A-Share
 
-分别实现独立数据、Session、信息、规则、Agent、Skills和状态机。
+先复盘 Crypto 中已经验证稳定的共享能力，再分别实现 US Equity 和 A-Share 的独立数据、
+Session、信息、规则、Agent、Skills、Policy 和状态机。两个市场仍按独立 bounded context
+推进，不复制 Crypto 市场语义。
 
 ### Phase 4：Information Intelligence
 
@@ -686,7 +697,7 @@ Loot/
 
 ### Phase 5：Replay and Calibration
 
-- 历史回放
+- 大规模历史回放和滚动窗口回测
 - Signal统计
 - Skill和Policy版本对比
 - 用户反馈分析
@@ -708,7 +719,6 @@ Loot/
 
 - 三个市场各自主要监控周期。
 - 每个市场首批数据Provider及fallback。
-- 第一条端到端实现选择哪个市场。
 - 第一批Signal类型和阈值配置方式。
 - 手机通知首选渠道。
 - LLM Provider和模型预算。

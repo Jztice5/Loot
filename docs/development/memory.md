@@ -6,6 +6,8 @@
 ## 当前状态
 
 - 当前阶段：Phase 0 Architecture Foundation。
+- 当前交付策略：Crypto First Vertical Slice；Crypto 初版闭环验收和复盘前不实现
+  US Equity 或 A-Share 领域业务。
 - 已建立核心 contracts、Signal State Machine v0.1、Crypto 行情 Provider v0.1，并完成
   REQ-0009 地基不变量修正。
 - 当前代码入口：`main.py` 仍是示例；核心代码位于 `src/loot/contracts`、
@@ -22,6 +24,9 @@
 
 - 当前 Python `DecisionTicket` 仍表达 Policy 前建议；REQ-0007 前必须迁移为
   `DecisionProposal`，再增加 Policy 后的新 Ticket。
+- 当前 `Direction` 只用于 TradingPlan，`PositionSide` 只用于人工持仓；新设计要求
+  Candidate 到 Signal 显式贯穿 direction。代码契约尚未实现，分别由 REQ-0005 和
+  REQ-0007 落地。
 - Persistence、migrations、Skill Runtime 和 Alert 尚未实现。
 
 稳定边界、完整设计链和模块不变量只在 [AGENTS.md](../../AGENTS.md) 与

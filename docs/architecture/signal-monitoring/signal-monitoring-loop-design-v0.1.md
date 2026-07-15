@@ -5,7 +5,7 @@
 | 状态 | Proposed |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
-| 最后设计回归 | 2026-07-14 |
+| 最后设计回归 | 2026-07-15 |
 | 依赖 | Loot 宏观技术设计 |
 | 涉及领域 | Platform、Crypto、US Equity、A-Share、Signal、Alert |
 
@@ -26,6 +26,12 @@
 → 追加PositionEvent
 → 更新后续监控上下文
 ```
+
+### 1.1 Current Delivery Scope
+
+本文描述三市场最终闭环，但当前实施只推进 Crypto。Platform、Signal、Persistence 和
+Alert 的初版也必须由 Crypto 真实链路驱动，不同时实现 US Equity 或 A-Share 领域逻辑。
+Crypto 从行情输入到最小 Replay 完成验收和复盘后，才能提炼共享经验并启动另外两个市场。
 
 ## 2. Goals
 
@@ -57,7 +63,7 @@
 
 ### Scenario B：创建交易计划
 
-用户为某只A股配置方向、主要周期、失效位置和趋势退出方式。系统分析时必须带入TradingPlan。
+用户为 BTC/USDT 配置方向、主要周期、失效位置和趋势退出方式。系统分析时必须带入TradingPlan。
 
 ### Scenario C：手动记录开仓
 
@@ -303,6 +309,7 @@ SignalInstance
 - instrument_id: UUID
 - timeframe: Timeframe
 - signal_type: SignalType
+- direction: LONG | SHORT | NEUTRAL
 - state: OBSERVING | ARMED | TRIGGERED | CONFIRMED |
          WEAKENING | INVALIDATED | RESOLVED | EXPIRED
 - priority: Priority
@@ -319,17 +326,18 @@ SignalInstance
 唯一键建议：
 
 ```text
-生命周期唯一键：(watch_item_id, timeframe, signal_type, generation)
-市场结构 setup：(watch_item_id, timeframe, signal_type, setup_key)，position_id 必须为空
-持仓风险 setup：(position_id, timeframe, signal_type, setup_key)，使用独立 SignalType
+生命周期唯一键：(watch_item_id, timeframe, signal_type, direction, generation)
+市场结构 setup：(watch_item_id, timeframe, signal_type, direction, setup_key)，position_id 必须为空
+持仓风险 setup：(position_id, timeframe, signal_type, direction, setup_key)，使用独立 SignalType
 ```
 
 持久化时使用 partial unique index，保证同一监控身份同一时刻最多一个非终态 Signal，
 并避免 nullable position_id 让同一市场结构信号重复创建。
 
-当 MonitoringSubscription 首次激活某个 SignalType 时，由 Signal State Machine 的
-初始化入口幂等创建 `OBSERVING` SignalInstance。初始化不表达市场判断，因此不需要
-DecisionTicket；初始化之后的所有状态变化都必须持 Policy Gate 签发的 Ticket。
+当 MonitoringSubscription 首次激活某个 SignalType 和 Direction 监控通道时，由
+Signal State Machine 的初始化入口幂等创建 `OBSERVING` SignalInstance。初始化不表达
+市场判断，因此不需要 DecisionTicket；具体启用哪些方向由 Crypto Domain 根据监控配置
+确定，初始化之后的所有状态变化都必须持 Policy Gate 签发的 Ticket。
 Agent、Skill、PreFilter 和 Decision Builder 均不能创建 SignalInstance。
 
 初始 Signal 的 `latest_decision_ticket_id` 为 null，generation 从 1 开始。Signal 到达
@@ -541,6 +549,7 @@ NO_CANDIDATE
 或
 CandidateEvent
 - candidate_type
+- direction
 - trigger_reason
 - snapshot_id
 - watch_item_id
@@ -554,14 +563,17 @@ CandidateEvent
 
 - 接近用户关键区域
 - 新K线突破当前结构区
+- 新K线向下跌破当前结构区
 - 成交量异常
 - 趋势结构改变
 - 当前价格接近持仓失效位置
 - 新信息事件映射到该标的
 
-市场结构候选的真假只由市场事实决定。Position 可以影响 Policy、优先级、
-position_impact 和提醒语义，但不能把未成立的市场结构变成已成立。未来持仓专属风险
-应使用独立候选或 SignalType。
+市场结构候选的真假和方向只由市场事实决定。向上突破输出 `LONG`，向下跌破输出
+`SHORT`；无方向事件可以输出 `NEUTRAL`。TradingPlan 和 Position 可以影响 Policy、
+优先级、position_impact 和提醒语义，但不能把未成立的市场结构变成已成立，也不能
+改写 Candidate.direction。现货出现 `SHORT` 只表示看空市场事实，是否可操作由
+InstrumentPolicy 和 Actionability 决定。未来持仓专属风险应使用独立候选或 SignalType。
 
 ## 15. Agent Context
 
@@ -878,18 +890,22 @@ MarketSnapshot
 
 至少准备以下Golden Case：
 
-1. 普通上涨但未突破，不产生 Candidate。
-2. 已收盘 K 线确认突破，产生 Candidate。
-3. 未收盘 K 线盘中突破，不产生 Candidate。
-4. Policy 拒绝 Proposal，不产生 DecisionTicket 和 SignalEvent。
-5. Policy DEFERRED 到期后在新上下文中重新评估。
-6. 自选接近阻力，进入ARMED。
-7. 放量突破，进入TRIGGERED。
-8. 突破失败，进入INVALIDATED；新 setup 可创建下一代 OBSERVING Signal。
-9. 同一事件重复三次，只产生一次状态迁移和提醒。
-10. 相同 Ticket ID 修改 payload 后被拒绝为冲突。
+1. 区间内普通上涨或下跌但未突破结构边界，不产生 Candidate。
+2. 已收盘 K 线向上突破结构高点，产生 `STRUCTURE_BREAKOUT + LONG` Candidate。
+3. 已收盘 K 线向下跌破结构低点，产生 `STRUCTURE_BREAKOUT + SHORT` Candidate。
+4. 未收盘 K 线盘中向上突破后回落，不产生 Candidate。
+5. 未收盘 K 线盘中向下跌破后收回，不产生 Candidate。
+6. 相同快照和方向重复处理，Candidate dedupe_key 稳定；不同方向不得复用 identity。
+7. Policy 拒绝 Proposal，不产生 DecisionTicket 和 SignalEvent。
+8. Policy DEFERRED 到期后在新上下文中重新评估。
+9. 自选接近阻力或支撑，进入对应方向的 ARMED。
+10. 对应方向放量突破，进入 TRIGGERED。
+11. 突破失败，进入 INVALIDATED；新 setup 可创建下一代 OBSERVING Signal。
+12. 同一事件重复三次，只产生一次状态迁移和提醒。
+13. 相同 Ticket ID 修改 payload 后被拒绝为冲突。
 
-三个市场必须分别维护Golden Case，不能只复用输入数据。
+当前阶段只实现 Crypto Golden Case。进入后续市场阶段后，三个市场必须分别维护
+Golden Case，不能直接复用 Crypto 输入数据和业务预期。
 
 ## 25. Acceptance Criteria
 
@@ -919,12 +935,13 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 
 ### Step 1：Contracts
 
-- Market、InstrumentType、Timeframe、SignalState枚举
+- Market、InstrumentType、Timeframe、Direction、SignalState枚举
 - EventEnvelope
 - WatchItem、TradingPlan、PositionEvent
 - CandidateEvent、EvidenceSet、DecisionProposal、PolicyEvaluation、DecisionTicket、
   SignalEvent
-- SignalInstance 的 nullable latest ticket、generation 和 setup_key
+- Candidate 到 Signal 的 direction 贯穿约束
+- SignalInstance 的 nullable latest ticket、generation、direction 和 setup_key
 
 ### Step 2：Persistence
 
@@ -950,12 +967,13 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - dedupe和optimistic locking
 - validated projection rebuild 和 payload fingerprint
 
-### Step 5：Market Vertical Stub
+### Step 5：Crypto Market Vertical Slice
 
-- 每个市场建立独立domain package
-- 先定义 Golden Case 输入和预期
-- 使用FakeProvider和FakePreFilter
-- 验证三条route不串线
+- 只实现 Crypto domain package
+- 先定义 Crypto Golden Case 输入和预期
+- 使用 FakeProvider 和 FakePreFilter 跑通方向性候选
+- 验证市场业务没有泄漏到 shared/platform
+- US Equity 和 A-Share 只保留最终边界设计，不创建业务 stub
 
 ### Step 6：Skill Runtime
 
@@ -995,10 +1013,10 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 
 ### Step 10：Real Provider and Replay Expansion
 
-- 选择首个市场Provider
-- 历史数据导入
-- 扩展 Golden Cases
-- 端到端Replay
+- 扩展 OKX Provider 的历史缺口补拉和数据质量
+- 导入 Crypto 历史数据
+- 扩展 Crypto Golden Cases
+- 完成固定 Snapshot 到 Signal/Alert 的最小端到端 Replay
 
 ## 27. Rollout and Rollback
 
@@ -1009,7 +1027,7 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 3. 开启Dashboard提醒。
 4. 开启单一手机渠道。
 5. 扩展到更多自选标的。
-6. 分别启用另外两个Market Domain。
+6. Crypto 初版验收和复盘后，分别启动另外两个 Market Domain。
 
 ### Rollback
 
