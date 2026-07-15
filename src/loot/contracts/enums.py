@@ -72,7 +72,7 @@ class TradingPlanStatus(StrEnum):
 
 
 class Direction(StrEnum):
-    """交易计划方向偏向。"""
+    """市场判断或交易计划的方向偏向，不表达交易指令。"""
 
     LONG = "LONG"
     SHORT = "SHORT"

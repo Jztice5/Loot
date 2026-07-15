@@ -11,6 +11,7 @@
 - [`context/`](./context/)：项目上下文的时间语义、生命周期和跨任务接手规则。
 - [`signal-monitoring/`](./signal-monitoring/)：自选与持仓信号监控闭环设计，描述 WatchItem、TradingPlan、PositionEvent、Market Router、Signal State Machine 和 Alert Loop。
 - [`signal-state-machine/`](./signal-state-machine/)：Signal 状态迁移引擎，描述合法迁移、幂等语义、no-op 和错误类型。
+- [`testing/`](./testing/)：Golden Case、Replay 输入和评测口径，先固定业务预期再实现算法。
 
 当前实施采用 `Crypto First Vertical Slice`：三市场架构描述是最终边界，不代表并行开发。
 Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场业务与支撑它所必需的平台
@@ -22,6 +23,7 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 - [Loot 核心契约设计文档 V0.1](./contracts/loot-contracts-v0.1.md)
 - [Loot 决策运行时与授权链路设计 V0.1](./runtime/decision-flow-v0.1.md)
 - [Loot Crypto 行情数据 Provider 设计文档 V0.1](./market-domains/crypto-market-data-provider-v0.1.md)
+- [Loot Crypto Golden Cases V0.1](./testing/crypto-golden-cases-v0.1.md)
 - [Loot 自选与持仓信号监控闭环设计文档 V0.1](./signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - [Loot Signal State Machine 设计文档 V0.1](./signal-state-machine/loot-signal-state-machine-v0.1.md)
 - [Loot 时间上下文模型 V0.1](./context/temporal-context-model-v0.1.md)
