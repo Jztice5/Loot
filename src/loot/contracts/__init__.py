@@ -12,6 +12,7 @@ from loot.contracts.enums import (
     PositionEventType,
     PositionSide,
     PositionStatus,
+    PolicyOutcome,
     Priority,
     SignalState,
     SignalType,
@@ -30,12 +31,21 @@ from loot.contracts.portfolio import (
     VersionedCondition,
     WatchItem,
 )
-from loot.contracts.signals import DecisionTicket, EvidenceSet, SignalEvent, SignalInstance
+from loot.contracts.signals import (
+    DecisionProposal,
+    DecisionTicket,
+    EvidenceSet,
+    PolicyEvaluation,
+    PolicyGuardResult,
+    SignalEvent,
+    SignalInstance,
+)
 
 __all__ = [
     "Actionability",
     "CandidateEvent",
     "CandidateType",
+    "DecisionProposal",
     "DecisionTicket",
     "Direction",
     "EventEnvelope",
@@ -55,6 +65,9 @@ __all__ = [
     "PositionEventType",
     "PositionSide",
     "PositionStatus",
+    "PolicyEvaluation",
+    "PolicyGuardResult",
+    "PolicyOutcome",
     "PriceZone",
     "Priority",
     "SignalEvent",

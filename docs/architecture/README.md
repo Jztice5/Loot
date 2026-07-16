@@ -33,5 +33,5 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 
 - `architecture/skill-runtime/`：Skill Manifest、注册、执行、审计、超时和 allowlist 设计。
 - `architecture/market-domains/`：Crypto Provider 和 PreFilter 已完成，当前继续推进
-  Candidate 到 Signal 授权链路；Crypto 闭环复盘后再分别设计 US Equity 和 A-Share。
+  决策链路持久化基线；Crypto 闭环复盘后再分别设计 US Equity 和 A-Share。
 - `architecture/replay/`：Golden Case、Replay Engine 和评测口径设计。

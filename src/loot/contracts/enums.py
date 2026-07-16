@@ -139,6 +139,14 @@ class Actionability(StrEnum):
     DATA_QUALITY_BLOCKED = "DATA_QUALITY_BLOCKED"
 
 
+class PolicyOutcome(StrEnum):
+    """Policy Gate 对 DecisionProposal 的审核结果。"""
+
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    DEFERRED = "DEFERRED"
+
+
 class SignalState(StrEnum):
     """Signal State Machine 状态。"""
 

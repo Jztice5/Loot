@@ -2,10 +2,10 @@
 
 | 属性 | 值 |
 |---|---|
-| 状态 | Proposed |
+| 状态 | Implemented |
 | 版本 | 0.1 |
 | 日期 | 2026-07-10 |
-| 最后设计回归 | 2026-07-14 |
+| 最后实现校准 | 2026-07-16 |
 | 依赖 | Loot 系统宏观架构、自选与持仓信号监控闭环 |
 | 适用范围 | Phase 0：Architecture Foundation |
 
@@ -44,9 +44,8 @@ src/loot/contracts/
                    DecisionTicket、SignalInstance、SignalEvent
 ```
 
-上面是目标契约归属。当前 `signals.py` 仍只有旧语义 DecisionTicket；
-DecisionProposal、PolicyEvaluation 和 Policy 后的新 DecisionTicket 将在 REQ-0007
-统一迁移，不能通过增加第二个别名继续混用。
+REQ-0007 已完成统一迁移：`DecisionProposal` 只表达 Policy 前建议，
+`DecisionTicket` 只表达 Policy Gate 签发的授权凭证，代码中不保留旧语义别名。
 
 ## 3. 契约原则
 
@@ -118,8 +117,8 @@ Crypto 方向性 Candidate 必须包含 `direction: Direction`：
   Actionability，不属于 Candidate 的事实判断。
 
 方向性 Evidence 输出、DecisionProposal、DecisionTicket、SignalInstance 和 SignalEvent
-必须保持同一 direction。Policy Gate 可以拒绝、延后或降低可操作性，但不能把 LONG
-改写为 SHORT，反之亦然。
+必须保持同一 direction。Policy Gate 可以拒绝或延后，但不能把 LONG 改写为 SHORT，
+反之亦然；如需调整目标状态、可操作性或证据，必须生成新 Proposal。
 
 ### 4.4 PositionEvent
 
@@ -154,6 +153,8 @@ TradingPlan 配置版本、可选 Position 版本和 context_digest，防止审�
 
 方向性 Proposal 还必须绑定 direction，并与 Candidate、Evidence 和目标 Signal 一致。
 direction 必须进入 proposal_digest，禁止在 Policy 审核或 Ticket 签发阶段被静默修改。
+`EvidenceSet` 直接保留 `candidate_event_id`、`input_snapshot_id`、direction 和稳定
+`dedupe_key`，使 Proposal 前的证据链也可独立回放。
 
 `PolicyEvaluation` 是 Policy Gate 对 Proposal 的审计结果：
 
@@ -190,12 +191,14 @@ generation 和稳定 setup_key。终态实例不可重置；新市场结构创�
 `SignalEvent` 只表达真实状态变化：
 
 - `from_state` 和 `to_state` 不能相同。
-- 事件必须携带 `decision_ticket_id`。
+- 事件必须携带 `candidate_event_id`、`decision_proposal_id`、
+  `policy_evaluation_id`、`decision_ticket_id` 和 `input_snapshot_id`。
+- 事件 direction 必须与 Signal 和授权链一致。
 - 去重使用稳定 `dedupe_key`。
 
 ## 5. 验证策略
 
-当前使用 `unittest discover` 执行无外部测试依赖的契约测试：
+当前使用 `unittest discover` 执行无外部服务依赖的契约和运行时测试：
 
 ```bash
 py -3.12 -m unittest discover -s tests -p "test_*.py"
@@ -206,9 +209,7 @@ py -3.12 -m unittest discover -s tests -p "test_*.py"
 ## 6. 后续扩展
 
 - 按持久化设计补数据库表结构和迁移。
-- 为 Signal State Machine 增加合法迁移表。
-- 将当前 Policy 前的 `DecisionTicket` 代码契约迁移为 `DecisionProposal`，再增加
-  Policy 后的新 `DecisionTicket`，禁止两个不同语义共用同名类型。
+- 在 REQ-0008 将内存授权事实和 Signal 投影迁移到 PostgreSQL 事务与唯一约束。
 - 为 Skill Manifest、SkillRun 和 Guard 输出补契约。
 - 为 MarketBarClosedEvent 补事件信封映射和持久化幂等键。
 - 增加 JSON Schema 导出，服务 API 和事件消费者共享。

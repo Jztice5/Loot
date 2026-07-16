@@ -5,6 +5,7 @@
 | 状态 | Accepted |
 | 版本 | 0.1 |
 | 日期 | 2026-07-14 |
+| Phase 0 实现 | 2026-07-16，REQ-0007 |
 | 适用范围 | Candidate 到 Signal 的跨模块决策链路 |
 | 依赖 | 系统宏观架构、核心契约、Signal State Machine |
 
@@ -56,8 +57,9 @@ flowchart LR
     A --> E["EvidenceSet"]
     E --> R["DecisionProposal"]
     R --> G{"Policy Gate"}
-    G -- "拒绝或延后" --> V["PolicyEvaluation"]
-    G -- "批准" --> T["DecisionTicket"]
+    G --> V["PolicyEvaluation"]
+    V -- "REJECTED / DEFERRED" --> X["停止下游"]
+    V -- "APPROVED" --> T["DecisionTicket"]
     T --> S["Signal State Machine"]
     S --> SE["SignalEvent"]
     SE --> AP["Alert Policy"]
@@ -463,18 +465,28 @@ src/loot/notifications/          Alert Policy 和 Notifier
 
 三个 Market Domain 禁止直接依赖。共享 contracts 只表达协议，不承载市场业务规则。
 
+Phase 0 已落地：
+
+- `src/loot/domains/crypto/decision.py`：Crypto 确定性 Evidence/Proposal Builder。
+- `src/loot/domains/crypto/policy.py`：三态最小 Policy Gate。
+- `src/loot/signals/authorization.py`：授权仓库端口和内存只追加适配器。
+- `src/loot/signals/state_machine.py`：Signal 初始化、generation 和授权后迁移。
+- `tests/unit/domains/crypto/test_decision_flow.py`：Candidate 到 Signal 最小闭环测试。
+
+内存适配器只验证单进程语义，不代表已经具备跨进程恢复、数据库事务或 Outbox 能力。
+
 ## 13. 实施顺序
 
 1. 已完成：修复 Snapshot 身份、闭合时间和状态机投影校验等已复现地基问题。
 2. 固化 LONG、SHORT 成对的 Crypto Golden Case 输入和预期。
 3. 已完成：实现只读取已收盘 K 线、显式输出 direction 的 Crypto PreFilter。
-4. 实现 OBSERVING SignalInstance 的幂等初始化和 generation 规则。
-5. 将现有 Policy 前的 `DecisionTicket` 契约迁移为 `DecisionProposal`。
-6. 增加可重评的 `PolicyEvaluation` 和最小 Policy Gate。
-7. 增加绑定上下文版本的 Policy 后 `DecisionTicket` 契约。
-8. 让 Signal State Machine 从事实源验证授权链后执行迁移。
-9. 补拒绝、延后重评、重复投递、过期 Ticket、上下文冲突和恢复路径测试。
-10. 再落地持久化 Inbox、Outbox 和乐观锁。
+4. 已完成：实现 OBSERVING SignalInstance 的幂等初始化和 generation 规则。
+5. 已完成：将 Policy 前旧 `DecisionTicket` 契约迁移为 `DecisionProposal`。
+6. 已完成：增加可重评的 `PolicyEvaluation` 和 Crypto 最小 Policy Gate。
+7. 已完成：增加绑定方向与上下文版本的 Policy 后 `DecisionTicket`。
+8. 已完成：Signal State Machine 从授权事实仓库验证完整链路后执行迁移。
+9. 已完成：补拒绝、延后重评、重复投递、过期 Ticket 和上下文冲突测试。
+10. 当前后续：在 REQ-0008 落地 PostgreSQL、Inbox、Outbox 和乐观锁。
 11. 最后接入 Agent、Alert 和真实调度。
 
 契约迁移期间不得同时保留两个同名但不同语义的 DecisionTicket。

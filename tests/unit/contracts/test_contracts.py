@@ -14,6 +14,7 @@ from loot.contracts import (
     Actionability,
     CandidateEvent,
     CandidateType,
+    DecisionProposal,
     DecisionTicket,
     Direction,
     EventEnvelope,
@@ -54,10 +55,10 @@ class RaisesValidationError:
         return None
 
     def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
+            self,
+            exc_type: type[BaseException] | None,
+            exc_value: BaseException | None,
+            traceback: TracebackType | None,
     ) -> bool:
         if exc_type is None:
             raise AssertionError("ValidationError was not raised")
@@ -186,12 +187,17 @@ class ContractModelTest(unittest.TestCase):
                 market=Market.A_SHARE,
                 instrument_id=uuid4(),
                 signal_type=SignalType.VOLUME_BREAKOUT,
+                direction=Direction.NEUTRAL,
                 from_state=SignalState.ARMED,
                 to_state=SignalState.ARMED,
                 priority=Priority.HIGH,
                 actionable_now=False,
                 position_impact="PROFIT_PROTECTION",
+                candidate_event_id=uuid4(),
+                decision_proposal_id=uuid4(),
+                policy_evaluation_id=uuid4(),
                 decision_ticket_id=uuid4(),
+                input_snapshot_id=uuid4(),
                 occurred_at=aware_now(),
                 dedupe_key="same-state",
             )
@@ -216,18 +222,21 @@ class ContractModelTest(unittest.TestCase):
         with RaisesValidationError("expires_at must be later than observed_at"):
             EvidenceSet(
                 id=uuid4(),
+                candidate_event_id=uuid4(),
                 skill_run_id=uuid4(),
                 skill_id="crypto.pa",
                 skill_version="1.0.0",
                 input_snapshot_id=uuid4(),
+                direction=Direction.LONG,
                 quality=Decimal("0.8"),
                 observed_at=aware_now(),
                 expires_at=aware_now(),
+                dedupe_key="evidence-1",
             )
 
     def test_signal_instance_rejects_expiry_before_transition(self) -> None:
         with RaisesValidationError(
-            "expires_at must not be earlier than last_transition_at"
+                "expires_at must not be earlier than last_transition_at"
         ):
             SignalInstance(
                 id=uuid4(),
@@ -236,6 +245,7 @@ class ContractModelTest(unittest.TestCase):
                 instrument_id=uuid4(),
                 timeframe=Timeframe.H1,
                 signal_type=SignalType.MARKET_STRUCTURE,
+                direction=Direction.LONG,
                 state=SignalState.ARMED,
                 priority=Priority.HIGH,
                 actionability=Actionability.WATCH_ONLY,
@@ -256,6 +266,7 @@ class ContractModelTest(unittest.TestCase):
             instrument_id=uuid4(),
             timeframe=Timeframe.H1,
             signal_type=SignalType.MARKET_STRUCTURE,
+            direction=Direction.LONG,
             state=SignalState.OBSERVING,
             priority=Priority.NORMAL,
             actionability=Actionability.WATCH_ONLY,
@@ -297,6 +308,7 @@ class ContractModelTest(unittest.TestCase):
                 instrument_id=uuid4(),
                 timeframe=Timeframe.H1,
                 signal_type=SignalType.MARKET_STRUCTURE,
+                direction=Direction.LONG,
                 state=SignalState.ARMED,
                 priority=Priority.NORMAL,
                 actionability=Actionability.WATCH_ONLY,
@@ -307,22 +319,55 @@ class ContractModelTest(unittest.TestCase):
                 version=1,
             )
 
-    def test_decision_ticket_requires_evidence_refs_and_skill_versions(self) -> None:
-        with RaisesValidationError("List should have at least 1 item"):
-            DecisionTicket(
+    def test_decision_proposal_requires_evidence_refs(self) -> None:
+        with RaisesValidationError("Tuple should have at least 1 item"):
+            DecisionProposal(
                 id=uuid4(),
+                candidate_event_id=uuid4(),
                 market=Market.CRYPTO,
                 instrument_id=uuid4(),
                 timeframe=Timeframe.H1,
+                signal_type=SignalType.MARKET_STRUCTURE,
+                direction=Direction.LONG,
+                signal_id=uuid4(),
                 suggested_transition=SignalState.TRIGGERED,
-                evidence_refs=[],
+                evidence_refs=(),
                 skill_versions={"crypto.signal_decision": "1.0.0"},
                 rule_version="1.0.0",
                 actionability=Actionability.WATCH_ONLY,
                 position_impact="NONE",
                 input_snapshot_id=uuid4(),
+                expected_signal_version=0,
+                watch_item_version=1,
+                context_digest="context-1",
                 decision_summary="Candidate confirmed",
                 created_at=aware_now(),
+                dedupe_key="proposal-1",
+            )
+
+    def test_decision_ticket_requires_expiry_after_issue(self) -> None:
+        with RaisesValidationError("expires_at must be later than issued_at"):
+            DecisionTicket(
+                id=uuid4(),
+                proposal_id=uuid4(),
+                policy_evaluation_id=uuid4(),
+                policy_version="crypto.policy.v1",
+                proposal_digest="proposal-digest",
+                market=Market.CRYPTO,
+                instrument_id=uuid4(),
+                timeframe=Timeframe.H1,
+                direction=Direction.LONG,
+                signal_id=uuid4(),
+                authorized_transition=SignalState.ARMED,
+                actionability=Actionability.WATCH_ONLY,
+                position_impact="NONE",
+                input_snapshot_id=uuid4(),
+                expected_signal_version=0,
+                watch_item_version=1,
+                context_digest="context-1",
+                issued_at=aware_now(),
+                expires_at=aware_now(),
+                dedupe_key="ticket-1",
             )
 
 
