@@ -8,7 +8,7 @@
     让 ORM 对象替代 Pydantic 契约。
 
 调用链:
-    Alembic/Repository -> SQLAlchemy Table metadata -> PostgreSQL schema ``loot``
+    Repository/Integration Test -> SQLAlchemy Table metadata -> PostgreSQL schema ``loot``
 """
 
 from __future__ import annotations
@@ -384,14 +384,20 @@ decision_ticket_consumptions = sa.Table(
     sa.Column(
         "decision_ticket_id",
         UUID,
-        sa.ForeignKey("loot.decision_tickets.id"),
+        sa.ForeignKey(
+            "loot.decision_tickets.id",
+            name="fk_ticket_consumptions_ticket",
+        ),
         primary_key=True,
     ),
     sa.Column("signal_id", UUID, sa.ForeignKey("loot.signal_instances.id"), nullable=False),
     sa.Column(
         "transition_id",
         UUID,
-        sa.ForeignKey("loot.signal_transitions.id"),
+        sa.ForeignKey(
+            "loot.signal_transitions.id",
+            name="fk_ticket_consumptions_transition",
+        ),
     ),
     sa.Column("ticket_fingerprint", FINGERPRINT, nullable=False),
     sa.Column("consumed_at", UTC_TIMESTAMP, nullable=False),

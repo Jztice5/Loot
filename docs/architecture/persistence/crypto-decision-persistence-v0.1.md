@@ -133,14 +133,16 @@ Outbox 保存 `available_at`、`published_at`、`attempt_count`、`last_error` �
 
 ## 8. 安全与权限
 
-- Alembic 使用 `loot_migrator`；应用 Repository 使用 `loot_app`。
+- 版本化 SQL migration 使用 `loot_migrator` 在 DBX 中执行；应用 Repository 使用
+  `loot_app`。
 - Repository SQL 显式使用 `loot` schema，不依赖超级用户 search_path。
 - DSN 只从环境变量读取，异常和日志不得输出密码。
 - 测试只使用 `loot_test`，禁止清理或 truncate `loot_dev`。
 
 ## 9. 验证
 
-- migration upgrade/downgrade 在空 `loot_test` schema 可重复执行。
+- SQL migration 在空 `loot_test` schema 可完整执行；破坏性回滚不内置在建表脚本中，
+  需要回退时使用独立修复 migration 或恢复测试库。
 - Repository 覆盖成功、重复、冲突 payload 和事务回滚。
 - Workflow 覆盖进程重建后的 Ticket 重复、并发 Signal 初始化、乐观锁冲突和 Outbox 恢复。
 - DBX 验证表、索引、约束、角色权限和 UTC 时间类型。

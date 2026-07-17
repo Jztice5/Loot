@@ -14,7 +14,7 @@
 ## 实施顺序
 
 1. 固定 Schema、约束、事务和失败语义。
-2. 增加 SQLAlchemy、psycopg 和 Alembic 基础设施及首个 migration。
+2. 增加 SQLAlchemy、psycopg 基础设施及首个可由 DBX 直接执行的版本化 SQL migration。
 3. 实现 Evidence/Proposal 与 Inbox/Outbox 原子写入。
 4. 实现 PolicyEvaluation/Ticket/Outbox 原子写入和可重评语义。
 5. 实现 Signal 初始化、Ticket 消费、Transition、SignalEvent Outbox 原子事务。

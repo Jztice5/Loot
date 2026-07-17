@@ -9,7 +9,6 @@ description = "Personal multi-market signal monitoring system."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alembic>=1.14,<2",
     "pydantic>=2.7,<3",
     "psycopg[binary]>=3.2,<4",
     "SQLAlchemy>=2.0.36,<3",

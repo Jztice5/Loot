@@ -18,15 +18,15 @@
 ## 当前执行与恢复点
 
 - 活跃需求：`REQ-0008` Crypto 决策链路持久化可靠性基线，状态为 In Progress。
-- 恢复动作：先由用户在 `loot_test` 应用 `20260716_0001` migration，再通过 DBX 验收
-  10 张表、索引、约束和权限；随后配置 `LOOT_TEST_DATABASE_URL`，执行 PostgreSQL
-  端到端测试并修复真实数据库差异，最后在 `loot_dev` 应用同一 migration。
+- 恢复动作：`loot_test` 已应用 `20260716_0001` SQL migration，并已通过 `loot_app`
+  专用 DBX 连接和 PostgreSQL 端到端测试；下一步复核数据库约束与索引后，在
+  `loot_dev` 应用同一 SQL migration。
 - memory 不复制 Planned 队列；需求顺序变化只更新需求管理。
 
 ## 当前实现差异
 
-- PostgreSQL 持久化实现已进入代码，但 `loot_test` 尚未应用 migration；当前只能确认
-  68 个非数据库测试通过，真实重启幂等、事务回滚和数据库权限仍待集成测试验收。
+- PostgreSQL 持久化实现和 `loot_test` migration 已通过真实连接验收；`loot_app` 对
+  10 张业务表具备 DML 权限且不能在 `loot` schema 建表。`loot_dev` 尚未应用 migration。
 - Skill Runtime、Agent、Alert 和最小 Replay 尚未实现。
 
 稳定边界、完整设计链和模块不变量只在 [AGENTS.md](../../AGENTS.md) 与
@@ -44,11 +44,11 @@
 
 已实际执行：
 
-- `python -m pytest -q`：68 个测试通过，1 个 PostgreSQL 集成测试因未配置
-  `LOOT_TEST_DATABASE_URL` 而跳过。
+- 配置 `LOOT_TEST_DATABASE_URL` 后执行 `python -m pytest -q`：69 个测试全部通过。
 - `python -m compileall -q src tests migrations`：通过。
-- `python -m alembic upgrade head --sql`：离线 migration SQL 生成通过。
-- `python scripts/check_context.py`：通过；55 个 Markdown、137 个本地链接，Skill 镜像一致。
+- `migrations/versions/20260716_0001_crypto_decision_persistence.sql`：已提供 DBX 可直接执行的
+  事务型 SQL migration，真实执行结果待 `loot_test` 验收。
+- `python scripts/check_context.py`：通过；57 个 Markdown、143 个本地链接，Skill 镜像一致。
 
 完整环境初始化和验证命令见 [本地运行说明](../runbooks/local-run.md)。旧 macOS 验证结果
 保留在对应季度日志中，不再表述为当前机器已复验。

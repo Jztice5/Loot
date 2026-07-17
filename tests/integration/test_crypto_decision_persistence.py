@@ -40,6 +40,7 @@ from loot.persistence.schema import (
     decision_ticket_consumptions,
     decision_tickets,
     evidence_sets,
+    inbox_messages,
     outbox_events,
     policy_evaluations,
     signal_instances,
@@ -52,6 +53,7 @@ from loot.signals import (
 )
 
 _DATABASE_URL = os.environ.get("LOOT_TEST_DATABASE_URL")
+_INTEGRATION_CONSUMER = "integration.crypto-candidate"
 
 
 @unittest.skipUnless(
@@ -83,6 +85,7 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
     def setUp(self) -> None:
         """Allocate unique identities and persistence adapters."""
 
+        self._delete_stale_inbox_messages()
         self.signal_workflow = PostgresSignalWorkflow(self.engine)
         self.authorization_repository = PostgresAuthorizationRepository(self.engine)
         self.analysis_repository = PostgresAnalysisRepository(self.engine)
@@ -157,6 +160,21 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
                         signal_instances.c.id == self.signal_id
                     )
                 )
+            connection.execute(
+                sa.delete(inbox_messages).where(
+                    inbox_messages.c.consumer_name == _INTEGRATION_CONSUMER
+                )
+            )
+
+    def _delete_stale_inbox_messages(self) -> None:
+        """Remove records left by an interrupted prior integration test run."""
+
+        with self.engine.begin() as connection:
+            connection.execute(
+                sa.delete(inbox_messages).where(
+                    inbox_messages.c.consumer_name == _INTEGRATION_CONSUMER
+                )
+            )
 
     def test_authorization_transition_and_restart_duplicate(self) -> None:
         now = datetime(2026, 7, 16, 8, 0, tzinfo=UTC)
@@ -206,7 +224,7 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
         message_id = uuid4()
         self.correlation_ids.add(message_id)
         first_analysis = self.analysis_repository.record_analysis_result(
-            consumer_name="integration.crypto-candidate",
+            consumer_name=_INTEGRATION_CONSUMER,
             message_id=message_id,
             message_payload={"candidate": candidate.model_dump(mode="json")},
             received_at=now - timedelta(minutes=4),
@@ -215,7 +233,7 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
             proposal=build_result.proposal,
         )
         duplicate_analysis = self.analysis_repository.record_analysis_result(
-            consumer_name="integration.crypto-candidate",
+            consumer_name=_INTEGRATION_CONSUMER,
             message_id=message_id,
             message_payload={"candidate": candidate.model_dump(mode="json")},
             received_at=now - timedelta(minutes=4),

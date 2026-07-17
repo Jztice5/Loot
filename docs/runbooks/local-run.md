@@ -2,8 +2,9 @@
 
 ## 当前状态
 
-当前仓库已建立 Python 项目骨架、核心 contracts、Signal State Machine 和 Crypto 行情
-Provider。正式 API、worker 和数据库尚未启动，`main.py` 仍是示例入口。
+当前仓库已建立 Python 项目骨架、核心 contracts、Signal State Machine、Crypto 行情
+Provider 和 PostgreSQL 决策持久化基线。正式 API、worker 尚未启动，`main.py` 仍是
+示例入口。
 
 项目要求 Python 3.12+，依赖以 `pyproject.toml` 为准。首次克隆、切换设备或依赖变化后，
 必须先执行环境初始化，不能直接复用旧 `.venv` 的历史状态。
@@ -71,18 +72,20 @@ py -3.12 -m venv .venv
 $env:PYTHONPATH = Join-Path $PWD 'src'
 & .\.venv\Scripts\python.exe scripts\check_context.py
 & .\.venv\Scripts\python.exe -m compileall -q src tests scripts
-& .\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_*.py'
+& .\.venv\Scripts\python.exe -m pytest -q
 & .\.venv\Scripts\python.exe main.py
 ```
 
 ## 预期基线
 
-当前测试基线的预期输出包含：
+未配置 PostgreSQL 测试连接时，当前预期基线为：
 
 ```text
-Ran 41 tests
-OK
+68 passed, 1 skipped
 ```
+
+在 `loot_test` 配置 `LOOT_TEST_DATABASE_URL` 后，当前预期基线为 `69 passed`。数据库
+初始化和权限验证见 [PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
 
 `main.py` 的当前预期输出：
 

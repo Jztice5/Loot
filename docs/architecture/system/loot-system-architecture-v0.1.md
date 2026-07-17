@@ -525,7 +525,7 @@ redis
 | 位置 | 建议 |
 |---|---|
 | Backend | Python、FastAPI、Pydantic |
-| Persistence | PostgreSQL、TimescaleDB、SQLAlchemy、Alembic |
+| Persistence | PostgreSQL、TimescaleDB、SQLAlchemy、版本化 SQL migration |
 | Event Transport | Redis Streams |
 | Quantitative | NumPy、Polars |
 | Agent Runtime | 自研轻量Typed Skill Runtime和LLM Provider接口 |

@@ -28,6 +28,7 @@
 - Crypto 行情数据 Provider：[architecture/market-domains/crypto-market-data-provider-v0.1.md](architecture/market-domains/crypto-market-data-provider-v0.1.md)
 - Crypto Structure PreFilter：[architecture/market-domains/crypto-prefilter-v0.1.md](architecture/market-domains/crypto-prefilter-v0.1.md)
 - Crypto Golden Cases：[architecture/testing/crypto-golden-cases-v0.1.md](architecture/testing/crypto-golden-cases-v0.1.md)
+- Crypto 决策链路持久化：[architecture/persistence/crypto-decision-persistence-v0.1.md](architecture/persistence/crypto-decision-persistence-v0.1.md)
 - 时间上下文模型：[architecture/context/temporal-context-model-v0.1.md](architecture/context/temporal-context-model-v0.1.md)
 
 ## 开发过程
@@ -44,6 +45,7 @@
 ## Runbooks
 
 - 本地运行说明：[runbooks/local-run.md](runbooks/local-run.md)
+- PostgreSQL SQL Migration：[runbooks/postgresql-sql-migrations.md](runbooks/postgresql-sql-migrations.md)
 - 上下文健康检查：[runbooks/context-health-check.md](runbooks/context-health-check.md)
 - 同步项目 Skills：[runbooks/sync-project-skills.md](runbooks/sync-project-skills.md)
 
