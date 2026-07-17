@@ -210,6 +210,46 @@ class SignalStateMachineTest(unittest.TestCase):
         with self.assertRaises(SignalInitializationConflictError):
             self.state_machine.initialize(replace(request, setup_key="setup-2"))
 
+    def test_database_projection_can_be_restored_for_authorized_transition(self) -> None:
+        signal = initialize_signal(self.state_machine)
+        _, _, ticket = record_authorization(
+            self.repository,
+            signal,
+            target_state=SignalState.ARMED,
+        )
+        restarted_state_machine = SignalStateMachine(self.repository)
+
+        restarted_state_machine.restore_projection(
+            SignalInstance.model_validate(signal.model_dump())
+        )
+        result = restarted_state_machine.apply(
+            signal,
+            ticket,
+            sample_context(),
+            occurred_at=aware_now(),
+        )
+
+        self.assertTrue(result.changed)
+        self.assertEqual(result.signal.state, SignalState.ARMED)
+        self.assertEqual(result.signal.version, 1)
+
+    def test_build_initial_signal_rejects_invalid_generation(self) -> None:
+        request = SignalInitializationRequest(
+            watch_item_id=uuid4(),
+            market=Market.CRYPTO,
+            instrument_id=uuid4(),
+            timeframe=Timeframe.H1,
+            signal_type=SignalType.MARKET_STRUCTURE,
+            direction=Direction.LONG,
+            priority=Priority.NORMAL,
+            actionability=Actionability.WATCH_ONLY,
+            setup_key="setup-invalid-generation",
+            initialized_at=aware_now(),
+        )
+
+        with self.assertRaisesRegex(ValueError, "generation"):
+            SignalStateMachine.build_initial_signal(request, generation=0)
+
     def test_terminal_signal_allows_next_generation(self) -> None:
         signal = initialize_signal(self.state_machine)
         _, _, ticket = record_authorization(

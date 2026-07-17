@@ -115,6 +115,65 @@ class PolicyAuthorizationRepository(AuthorizationRepository, Protocol):
         ...
 
 
+def validate_authorization_references(
+        proposal: DecisionProposal,
+        evaluation: PolicyEvaluation,
+        ticket: DecisionTicket | None,
+) -> None:
+    """校验 Proposal、Evaluation 与可选 Ticket 的不可变引用关系。
+
+    业务原因:
+        内存和 PostgreSQL 适配器必须共享同一套写入前规则，避免测试适配器与生产事实
+        仓库对授权链合法性的解释发生漂移。
+    """
+
+    proposal_digest = proposal.content_digest()
+    if evaluation.proposal_id != proposal.id:
+        raise AuthorizationConflictError(
+            "policy evaluation does not reference the proposal"
+        )
+    if evaluation.proposal_digest != proposal_digest:
+        raise AuthorizationConflictError(
+            "policy evaluation proposal digest does not match the proposal"
+        )
+
+    if ticket is None:
+        if evaluation.outcome == PolicyOutcome.APPROVED:
+            raise AuthorizationConflictError(
+                "approved evaluation requires a decision ticket"
+            )
+        return
+
+    if evaluation.outcome != PolicyOutcome.APPROVED:
+        raise AuthorizationConflictError(
+            "rejected or deferred evaluation cannot issue a decision ticket"
+        )
+    if ticket.proposal_id != proposal.id:
+        raise AuthorizationConflictError(
+            "decision ticket does not reference the proposal"
+        )
+    if ticket.policy_evaluation_id != evaluation.id:
+        raise AuthorizationConflictError(
+            "decision ticket does not reference the policy evaluation"
+        )
+    if ticket.policy_version != evaluation.policy_version:
+        raise AuthorizationConflictError(
+            "decision ticket policy version does not match the evaluation"
+        )
+    if ticket.proposal_digest != proposal_digest:
+        raise AuthorizationConflictError(
+            "decision ticket proposal digest does not match the proposal"
+        )
+    if ticket.issued_at != evaluation.evaluated_at:
+        raise AuthorizationConflictError(
+            "decision ticket issued_at does not match the evaluation"
+        )
+    if ticket.expires_at > evaluation.expires_at:
+        raise AuthorizationConflictError(
+            "decision ticket validity exceeds the evaluation"
+        )
+
+
 class InMemoryAuthorizationRepository:
     """Phase 0 的只追加授权事实仓库。
 
@@ -211,7 +270,7 @@ class InMemoryAuthorizationRepository:
             不同按冲突拒绝。
         """
 
-        self._validate_references(proposal, evaluation, ticket)
+        validate_authorization_references(proposal, evaluation, ticket)
 
         existing_proposal = self._proposals.get(proposal.id)
         if existing_proposal is not None and existing_proposal != proposal:
@@ -305,48 +364,4 @@ class InMemoryAuthorizationRepository:
     ) -> None:
         """拒绝引用关系不一致的授权事实。"""
 
-        proposal_digest = proposal.content_digest()
-        if evaluation.proposal_id != proposal.id:
-            raise AuthorizationConflictError(
-                "policy evaluation does not reference the proposal"
-            )
-        if evaluation.proposal_digest != proposal_digest:
-            raise AuthorizationConflictError(
-                "policy evaluation proposal digest does not match the proposal"
-            )
-
-        if ticket is None:
-            if evaluation.outcome == PolicyOutcome.APPROVED:
-                raise AuthorizationConflictError(
-                    "approved evaluation requires a decision ticket"
-                )
-            return
-
-        if evaluation.outcome != PolicyOutcome.APPROVED:
-            raise AuthorizationConflictError(
-                "rejected or deferred evaluation cannot issue a decision ticket"
-            )
-        if ticket.proposal_id != proposal.id:
-            raise AuthorizationConflictError(
-                "decision ticket does not reference the proposal"
-            )
-        if ticket.policy_evaluation_id != evaluation.id:
-            raise AuthorizationConflictError(
-                "decision ticket does not reference the policy evaluation"
-            )
-        if ticket.policy_version != evaluation.policy_version:
-            raise AuthorizationConflictError(
-                "decision ticket policy version does not match the evaluation"
-            )
-        if ticket.proposal_digest != proposal_digest:
-            raise AuthorizationConflictError(
-                "decision ticket proposal digest does not match the proposal"
-            )
-        if ticket.issued_at != evaluation.evaluated_at:
-            raise AuthorizationConflictError(
-                "decision ticket issued_at does not match the evaluation"
-            )
-        if ticket.expires_at > evaluation.expires_at:
-            raise AuthorizationConflictError(
-                "decision ticket validity exceeds the evaluation"
-            )
+        validate_authorization_references(proposal, evaluation, ticket)

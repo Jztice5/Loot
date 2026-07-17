@@ -15,8 +15,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -39,6 +37,7 @@ from loot.contracts.enums import (
     SignalType,
     Timeframe,
 )
+from loot.contracts.serialization import payload_fingerprint
 
 
 def _validate_skill_versions(value: dict[str, str]) -> dict[str, str]:
@@ -182,13 +181,7 @@ class DecisionProposal(ContractModel):
     def content_digest(self) -> str:
         """返回锁定完整 Proposal payload 的 SHA-256 摘要。"""
 
-        canonical_payload = json.dumps(
-            self.model_dump(mode="json"),
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+        return payload_fingerprint(self)
 
 
 class PolicyGuardResult(ContractModel):

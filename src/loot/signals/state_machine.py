@@ -15,8 +15,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
@@ -37,6 +35,7 @@ from loot.contracts import (
     Timeframe,
 )
 from loot.contracts.base import ensure_non_empty, ensure_utc_datetime
+from loot.contracts.serialization import payload_fingerprint
 from loot.signals.authorization import (
     AuthorizationFacts,
     AuthorizationRepository,
@@ -266,8 +265,48 @@ class SignalStateMachine:
                 "active signal already exists for the monitoring identity"
             )
         generation = latest.generation + 1 if latest is not None else 1
-        dedupe_key = self._signal_dedupe_key(identity, generation, setup_key)
-        signal = SignalInstance(
+        signal = self.build_initial_signal(
+            replace(
+                request,
+                setup_key=setup_key,
+                initialized_at=initialized_at,
+                expires_at=expires_at,
+            ),
+            generation=generation,
+        )
+        self._register_signal(signal)
+        return SignalInitializationResult(signal=signal, created=True)
+
+    @classmethod
+    def build_initial_signal(
+            cls,
+            request: SignalInitializationRequest,
+            *,
+            generation: int,
+    ) -> SignalInstance:
+        """按仓库分配的 generation 构造完整校验后的初始 Signal。
+
+        调用链:
+            PostgreSQL advisory lock -> allocate generation -> build_initial_signal
+            -> repository insert
+
+        业务规则:
+            generation 的并发唯一性由事实仓库负责；本方法只负责归一化输入、稳定身份和
+            OBSERVING 投影契约，不能绕过仓库直接发布事实。
+        """
+
+        if generation < 1:
+            raise ValueError("generation must be positive")
+        initialized_at = ensure_utc_datetime(request.initialized_at)
+        expires_at = (
+            ensure_utc_datetime(request.expires_at)
+            if request.expires_at is not None
+            else None
+        )
+        setup_key = ensure_non_empty(request.setup_key)
+        identity = cls._identity_from_request(request)
+        dedupe_key = cls._signal_dedupe_key(identity, generation, setup_key)
+        return SignalInstance(
             id=uuid5(NAMESPACE_URL, dedupe_key),
             watch_item_id=request.watch_item_id,
             position_id=request.position_id,
@@ -287,8 +326,21 @@ class SignalStateMachine:
             expires_at=expires_at,
             version=0,
         )
-        self._register_signal(signal)
-        return SignalInitializationResult(signal=signal, created=True)
+
+    def restore_projection(self, signal: SignalInstance) -> None:
+        """把事实仓库读取并重新校验的 Signal 装载为本次迁移基线。
+
+        调用链:
+            PostgreSQL SELECT FOR UPDATE -> SignalInstance.model_validate
+            -> restore_projection -> apply
+
+        业务规则:
+            该入口只供持久化 workflow 在数据库事务内恢复当前投影；它不创建新事实、
+            不分配 generation，也不恢复 Ticket 消费账本。
+        """
+
+        validated = SignalInstance.model_validate(signal.model_dump())
+        self._register_signal(validated)
 
     def apply(
             self,
@@ -586,13 +638,7 @@ class SignalStateMachine:
     def _decision_ticket_fingerprint(decision_ticket: DecisionTicket) -> str:
         """计算 Ticket 完整 canonical payload 指纹。"""
 
-        canonical_payload = json.dumps(
-            decision_ticket.model_dump(mode="json"),
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+        return payload_fingerprint(decision_ticket)
 
     def _remember_result(
             self,

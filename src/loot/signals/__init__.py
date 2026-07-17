@@ -8,6 +8,7 @@ from loot.signals.authorization import (
     InMemoryAuthorizationRepository,
     PolicyAuthorizationRepository,
     PolicyRecordResult,
+    validate_authorization_references,
 )
 from loot.signals.state_machine import (
     DuplicateDecisionConflictError,
@@ -43,6 +44,7 @@ __all__ = [
     "InvalidSignalTransitionError",
     "PolicyRecordResult",
     "PolicyAuthorizationRepository",
+    "validate_authorization_references",
     "SignalAuthorizationContext",
     "SignalContextConflictError",
     "SignalInitializationConflictError",
