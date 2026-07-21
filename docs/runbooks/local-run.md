@@ -76,16 +76,28 @@ $env:PYTHONPATH = Join-Path $PWD 'src'
 & .\.venv\Scripts\python.exe main.py
 ```
 
+### 配置 PostgreSQL 集成测试
+
+首次或本地口令轮换后，运行以下命令并按提示输入 `loot_app` 的 `loot_test` 口令：
+
+```powershell
+& .\scripts\configure_test_database.ps1
+```
+
+该脚本只把 DSN 写入 `%USERPROFILE%\.loot\database.env`，不会写入仓库或 PowerShell 历史。
+CI 和临时覆盖仍可使用 `LOOT_TEST_DATABASE_URL` 环境变量，且环境变量优先于用户级配置。
+
 ## 预期基线
 
 未配置 PostgreSQL 测试连接时，当前预期基线为：
 
 ```text
-68 passed, 1 skipped
+71 passed, 7 skipped
 ```
 
-在 `loot_test` 配置 `LOOT_TEST_DATABASE_URL` 后，当前预期基线为 `69 passed`。数据库
-初始化和权限验证见 [PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
+配置 `%USERPROFILE%\.loot\database.env` 或 `LOOT_TEST_DATABASE_URL` 并可连接 `loot_test` 后，
+当前预期基线为 `78 passed`。数据库初始化和权限验证见
+[PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
 
 `main.py` 的当前预期输出：
 

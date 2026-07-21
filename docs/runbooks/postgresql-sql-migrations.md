@@ -15,10 +15,9 @@ SQL migration 只负责数据库结构；应用运行和集成测试始终使用
 |---|---|---|
 | 首次验证 | `loot_test` | `loot_migrator` |
 | 集成测试 | `loot_test` | `loot_app` |
-| 验收后应用 | `loot_dev` | `loot_migrator` |
 | 本地开发运行 | 优先 `loot_test` | `loot_app` |
 
-禁止使用 `postgres` 超级用户作为应用连接。密码只保存在 DBX 或本机环境变量中，不进入
+禁止使用 `postgres` 超级用户作为应用连接。密码只保存在 DBX、本机用户级配置或环境变量中，不进入
 仓库、日志、截图或测试 fixture。
 
 ## 在 DBX 执行
@@ -48,9 +47,12 @@ SELECT
 Windows PowerShell：
 
 ```powershell
-$env:LOOT_TEST_DATABASE_URL = 'postgresql+psycopg://loot_app:<password>@<host>:5432/loot_test'
+& .\scripts\configure_test_database.ps1
 & .\.venv\Scripts\python.exe -m pytest -q
 ```
+
+脚本将 DSN 写入 `%USERPROFILE%\.loot\database.env`，仅允许配置 `loot_test`。对于 CI 或一次性
+覆盖，可设置 `LOOT_TEST_DATABASE_URL`；环境变量优先于用户级配置。
 
 macOS/Linux：
 

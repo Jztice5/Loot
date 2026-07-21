@@ -19,7 +19,8 @@
 4. 实现 PolicyEvaluation/Ticket/Outbox 原子写入和可重评语义。
 5. 实现 Signal 初始化、Ticket 消费、Transition、SignalEvent Outbox 原子事务。
 6. 增加重启重复、冲突 payload、乐观锁、单活跃代和事务回滚测试。
-7. 通过 DBX 在 `loot_test` 验证 migration，在 `loot_dev` 应用同一版本。
+7. 通过 DBX 在 `loot_test` 验证 migration 和应用角色权限；`loot_dev` 的迁移属于后续
+   rollout/deployment 工作，不纳入本需求验收。
 
 ## 验收映射
 
