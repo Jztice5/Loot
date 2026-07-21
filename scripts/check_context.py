@@ -343,7 +343,15 @@ def check_skill_mirror(report: Report) -> str:
 
 def check_git_whitespace(report: Report) -> None:
     for args in (("git", "diff", "--check"), ("git", "diff", "--cached", "--check")):
-        result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            args,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
         if result.returncode:
             report.error(result.stdout.strip() or result.stderr.strip() or "git diff check failed")
 

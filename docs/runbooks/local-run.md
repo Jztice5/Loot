@@ -3,8 +3,8 @@
 ## 当前状态
 
 当前仓库已建立 Python 项目骨架、核心 contracts、Signal State Machine、Crypto 行情
-Provider 和 PostgreSQL 决策持久化基线。正式 API、worker 尚未启动，`main.py` 仍是
-示例入口。
+Provider、PostgreSQL 决策持久化和 Crypto Run-Once 入口。正式 API、常驻 worker 尚未启动，
+`main.py` 仍是示例入口。
 
 项目要求 Python 3.12+，依赖以 `pyproject.toml` 为准。首次克隆、切换设备或依赖变化后，
 必须先执行环境初始化，不能直接复用旧 `.venv` 的历史状态。
@@ -92,11 +92,11 @@ CI 和临时覆盖仍可使用 `LOOT_TEST_DATABASE_URL` 环境变量，且环境
 未配置 PostgreSQL 测试连接时，当前预期基线为：
 
 ```text
-78 passed, 7 skipped
+82 passed, 8 skipped
 ```
 
 配置 `%USERPROFILE%\.loot\database.env` 或 `LOOT_TEST_DATABASE_URL` 并可连接 `loot_test` 后，
-当前预期基线为 `85 passed`。数据库初始化和权限验证见
+当前预期基线为 `90 passed`。数据库初始化和权限验证见
 [PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
 
 `main.py` 的当前预期输出：
@@ -153,3 +153,29 @@ okx.public_rest 2 BTC-USDT <close_price> True
 
 如果网络、代理或 OKX 服务不可用，记录为外部 smoke 未通过；不能把它与本地单元测试失败
 混为一谈。
+
+## Crypto Run-Once
+
+Run-Once 只连接 `LOOT_TEST_DATABASE_URL` 指向的 `loot_test`。运行前需要完成本手册中的
+PostgreSQL 测试配置；命令会在任何写入前再次检查实际数据库名。
+
+Windows PowerShell：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode demo
+& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode live
+```
+
+macOS/Linux：
+
+```bash
+.venv/bin/python scripts/run_crypto_once.py --mode demo
+.venv/bin/python scripts/run_crypto_once.py --mode live
+```
+
+- `demo` 使用确定性 LONG 突破，预期返回 `SIGNAL_TRANSITIONED` 和 `ARMED`。
+- `live` 读取 OKX `BTC-USDT` 最近 4 根已收盘 H1 K 线；无突破时返回 `NO_CANDIDATE`。
+- 默认每次生成新的 `watch_item_id`；需要重用明确身份时传入 `--watch-item-id <UUID>`。
+- 成功运行不会清理数据。使用输出中的 Candidate、Signal、Proposal、PolicyEvaluation 和
+  DecisionTicket ID 在 DBX 的 `loot_test` / `loot` schema 做只读复核。
+- CLI 只输出稳定状态、原因和事实 ID；失败时不回显 DSN 或数据库驱动诊断。
