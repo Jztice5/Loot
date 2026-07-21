@@ -210,6 +210,7 @@ py -3.12 -m unittest discover -s tests -p "test_*.py"
 
 - 按持久化设计补数据库表结构和迁移。
 - 在 REQ-0008 将内存授权事实和 Signal 投影迁移到 PostgreSQL 事务与唯一约束。
-- 为 Skill Manifest、SkillRun 和 Guard 输出补契约。
+- Skill Manifest 与 SkillRun 已由
+  [Skill Runtime V0.1](../runtime/skill-runtime-v0.1.md)补齐；Guard 输出继续沿用 `PolicyGuardResult`。
 - 为 MarketBarClosedEvent 补事件信封映射和持久化幂等键。
 - 增加 JSON Schema 导出，服务 API 和事件消费者共享。

@@ -92,11 +92,11 @@ CI 和临时覆盖仍可使用 `LOOT_TEST_DATABASE_URL` 环境变量，且环境
 未配置 PostgreSQL 测试连接时，当前预期基线为：
 
 ```text
-71 passed, 7 skipped
+78 passed, 7 skipped
 ```
 
 配置 `%USERPROFILE%\.loot\database.env` 或 `LOOT_TEST_DATABASE_URL` 并可连接 `loot_test` 后，
-当前预期基线为 `78 passed`。数据库初始化和权限验证见
+当前预期基线为 `85 passed`。数据库初始化和权限验证见
 [PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
 
 `main.py` 的当前预期输出：
