@@ -42,7 +42,7 @@
 
 ## 当前验证基线
 
-验证日期：2026-07-21。
+代码验证日期：2026-07-21；上下文复验日期：2026-07-24。
 
 环境：
 
@@ -60,8 +60,8 @@
   `LONG / ARMED / version=1`，Policy 为 `APPROVED`，迁移为 `OBSERVING -> ARMED`。
 - `migrations/versions/20260716_0001_crypto_decision_persistence.sql`：已在 `loot_test` 真实执行；
   DBX 验证 10 张业务表、70 个显式业务约束、31 个索引（含 2 个 partial index）。
-- `& .\.venv\Scripts\python.exe scripts\check_context.py`：通过，67 个 Markdown、164 个本地链接，
-  `memory.md` 67 行，项目 Skill 与本机镜像一致。
+- `& .\.venv\Scripts\python.exe scripts\check_context.py`：2026-07-24 复验通过，68 个 Markdown、
+  167 个本地链接，项目 Skill 与本机镜像一致。
 
 完整环境初始化和验证命令见 [本地运行说明](../runbooks/local-run.md)。旧 macOS 验证结果
 保留在对应季度日志中，不再表述为当前机器已复验。
