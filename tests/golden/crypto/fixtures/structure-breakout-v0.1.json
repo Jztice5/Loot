@@ -1,0 +1,169 @@
+{
+  "schema_version": "crypto.structure-breakout.v1",
+  "instrument": {
+    "instrument_id": "37db1b0a-1c1f-5c9b-bf6f-58dfad3e8896",
+    "venue": "FAKE",
+    "symbol": "BTC-USDT",
+    "instrument_type": "SPOT",
+    "quote_currency": "USDT",
+    "timezone": "UTC",
+    "price_scale": 2
+  },
+  "timeframe": "1h",
+  "lookback_bars": 3,
+  "cases": [
+    {
+      "case_id": "insufficient-closed-history",
+      "description": "只有 3 根已收盘 K 线，无法同时形成参考窗口和触发 K 线。",
+      "as_of": "2026-07-09T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "INSUFFICIENT_CLOSED_HISTORY",
+        "reference_high": null,
+        "reference_low": null,
+        "trigger_close": "104"
+      }
+    },
+    {
+      "case_id": "range-close-no-break",
+      "description": "已收盘 K 线只有上影线越过前高，收盘仍在结构区间内。",
+      "as_of": "2026-07-10T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "104", "high": "106", "low": "102", "close": "104.5", "volume": "13", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "NO_CLOSED_STRUCTURE_BREAK",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "104.5"
+      }
+    },
+    {
+      "case_id": "closed-at-reference-high-no-break",
+      "description": "最新已收盘价等于前 3 根最高价，不满足严格上破。",
+      "as_of": "2026-07-10T12:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "104", "high": "106", "low": "103", "close": "105", "volume": "13", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "NO_CLOSED_STRUCTURE_BREAK",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "105"
+      }
+    },
+    {
+      "case_id": "closed-at-reference-low-no-break",
+      "description": "最新已收盘价等于前 3 根最低价，不满足严格下破。",
+      "as_of": "2026-07-10T16:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "100", "high": "101", "low": "97", "close": "98", "volume": "13", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "NO_CLOSED_STRUCTURE_BREAK",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "98"
+      }
+    },
+    {
+      "case_id": "closed-long-breakout",
+      "description": "最新已收盘 K 线收盘价严格高于前 3 根 K 线最高价。",
+      "as_of": "2026-07-11T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "104", "high": "108", "low": "103", "close": "107", "volume": "13", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": "STRUCTURE_BREAKOUT",
+        "direction": "LONG",
+        "reason_code": "CLOSED_ABOVE_REFERENCE_HIGH",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "107"
+      }
+    },
+    {
+      "case_id": "closed-short-breakdown",
+      "description": "最新已收盘 K 线收盘价严格低于前 3 根 K 线最低价。",
+      "as_of": "2026-07-12T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "100", "high": "101", "low": "95", "close": "96", "volume": "13", "is_closed": true}
+      ],
+      "expectation": {
+        "candidate_type": "STRUCTURE_BREAKOUT",
+        "direction": "SHORT",
+        "reason_code": "CLOSED_BELOW_REFERENCE_LOW",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "96"
+      }
+    },
+    {
+      "case_id": "unclosed-long-breakout-ignored",
+      "description": "最新未确认收盘 K 线向上突破，上一根已收盘 K 线仍在结构区间内。",
+      "as_of": "2026-07-13T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "104", "high": "105", "low": "102", "close": "104.5", "volume": "13", "is_closed": true},
+        {"open": "104.5", "high": "108", "low": "103", "close": "107", "volume": "14", "is_closed": false}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "UNCLOSED_BAR_IGNORED",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "104.5"
+      }
+    },
+    {
+      "case_id": "unclosed-short-breakdown-ignored",
+      "description": "最新未确认收盘 K 线向下跌破，上一根已收盘 K 线仍在结构区间内。",
+      "as_of": "2026-07-14T08:00:00Z",
+      "bars": [
+        {"open": "100", "high": "103", "low": "98", "close": "101", "volume": "10", "is_closed": true},
+        {"open": "101", "high": "104", "low": "99", "close": "103", "volume": "11", "is_closed": true},
+        {"open": "103", "high": "105", "low": "101", "close": "104", "volume": "12", "is_closed": true},
+        {"open": "100", "high": "102", "low": "99", "close": "100.5", "volume": "13", "is_closed": true},
+        {"open": "100.5", "high": "101", "low": "95", "close": "96", "volume": "14", "is_closed": false}
+      ],
+      "expectation": {
+        "candidate_type": null,
+        "direction": null,
+        "reason_code": "UNCLOSED_BAR_IGNORED",
+        "reference_high": "105",
+        "reference_low": "98",
+        "trigger_close": "100.5"
+      }
+    }
+  ]
+}

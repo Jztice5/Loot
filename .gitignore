@@ -1,1 +1,19 @@
 /.claude/
+.DS_Store
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local environments and IDE metadata
+.venv/
+venv/
+.idea/
