@@ -24,6 +24,7 @@
 - 核心契约设计：[architecture/contracts/loot-contracts-v0.1.md](architecture/contracts/loot-contracts-v0.1.md)
 - 决策运行时与授权链路：[architecture/runtime/decision-flow-v0.1.md](architecture/runtime/decision-flow-v0.1.md)
 - Skill Runtime：[architecture/runtime/skill-runtime-v0.1.md](architecture/runtime/skill-runtime-v0.1.md)
+- Runtime Console：[architecture/runtime/runtime-console-v0.1.md](architecture/runtime/runtime-console-v0.1.md)
 - 智能决策闭环机制：[architecture/runtime/intelligent-decision-loop-v0.1.md](architecture/runtime/intelligent-decision-loop-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Signal State Machine：[architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)

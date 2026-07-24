@@ -179,3 +179,38 @@ macOS/Linux：
 - 成功运行不会清理数据。使用输出中的 Candidate、Signal、Proposal、PolicyEvaluation 和
   DecisionTicket ID 在 DBX 的 `loot_test` / `loot` schema 做只读复核。
 - CLI 只输出稳定状态、原因和事实 ID；失败时不回显 DSN 或数据库驱动诊断。
+
+## Runtime Console 只读观察台
+
+Runtime Console 只读取 `loot_test` 中已有的决策事实，不执行 Run-Once，不写入数据库，也不
+提供业务状态修改入口。启动前必须已经配置 `LOOT_TEST_DATABASE_URL` 或用户级数据库配置。
+
+Windows PowerShell：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_runtime_console.py
+```
+
+macOS/Linux：
+
+```bash
+.venv/bin/python scripts/run_runtime_console.py
+```
+
+浏览器访问：`http://127.0.0.1:8765/`。
+
+可选参数：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_runtime_console.py --host 127.0.0.1 --port 8766
+```
+
+页面提供以下只读 API：
+
+- `GET /api/overview`
+- `GET /api/chains?limit=20`
+- `GET /api/signals?limit=20`
+- `GET /api/outbox?limit=20`
+
+如果数据库不可用，页面显示降级错误；如果实际数据库不是 `loot_test`，API 拒绝返回业务数据。
+Worker、Alert Center 和 Replay 在当前版本显示为 `not_implemented`，不代表这些能力已经上线。

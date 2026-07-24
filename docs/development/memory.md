@@ -10,7 +10,8 @@
   US Equity 或 A-Share 领域业务。
 - 已建立核心 contracts、Signal State Machine v0.1、Crypto 行情 Provider v0.1、
   Golden Cases V0.1、Crypto Structure PreFilter V0.1、Candidate 到 Signal 授权链路，
-  REQ-0008 PostgreSQL 持久化，以及 REQ-0013 Crypto Run-Once 可执行闭环。
+  REQ-0008 PostgreSQL 持久化、REQ-0013 Crypto Run-Once 可执行闭环，以及 REQ-0017
+  Runtime Console 只读观察台。
 - 正式单次运行入口为 `scripts/run_crypto_once.py`；`main.py` 仍是示例。核心代码位于
   `src/loot/application`、`src/loot/contracts`、`src/loot/runtime`、`src/loot/signals` 和
   `src/loot/domains/crypto`。
@@ -18,8 +19,9 @@
 
 ## 当前执行与恢复点
 
-- 当前没有 In Progress 需求；`REQ-0014` 至 `REQ-0016` 已进入 Planned 队列，下一恢复点是
-  启动 `REQ-0014` 的组件设计与契约定义。
+- 当前没有 In Progress 需求；下一恢复点是 `REQ-0014` 的组件设计与契约定义。
+- `REQ-0017` 已完成本地只读 Runtime Console，入口为
+  `scripts\run_runtime_console.py`，页面不会触发 Run-Once 或写入业务状态。
 - `REQ-0013` 已完成 demo/live Run-Once 应用服务、CLI、单元测试和 PostgreSQL 集成测试。
   手工 demo 事实已保留在 `loot_test`，复核入口见
   [过程记录](log/2026-Q3/2026-07-21-req-0013-crypto-run-once.md)。
@@ -44,7 +46,7 @@
 
 ## 当前验证基线
 
-代码验证日期：2026-07-21；上下文复验日期：2026-07-24。
+代码验证日期：2026-07-24；上下文复验日期：2026-07-24。
 
 环境：
 
@@ -54,16 +56,20 @@
 
 已实际执行：
 
-- `& .\.venv\Scripts\python.exe -m pytest -q`：90 passed（包含 8 个真实 PostgreSQL 集成测试）。
+- `& .\.venv\Scripts\python.exe -m pytest -q`：98 passed（包含 8 个真实 PostgreSQL 集成测试）。
 - `& .\.venv\Scripts\python.exe -m compileall -q src tests scripts migrations`：通过。
+- `& .\.venv\Scripts\python.exe -m pytest -q tests\unit\observability`：8 passed。
+- Runtime Console 真实 HTTP 复核：数据库为 `loot_test`，状态 `healthy`，Proposal 1、Signal 1、
+  未发布 Outbox 5；API 不返回 `last_error`。
+- 浏览器复核：桌面端与 390px 移动端无横向溢出；刷新按钮成功；控制台无 error/warning。
 - PyCharm 运行 `scripts\run_crypto_once.py --mode demo`：退出码 0，返回 LONG、ARMED 和完整
   Candidate/Proposal/Evaluation/Ticket/Signal ID。
 - DBX 对手工 demo 做只读复核：9 张链路表各 1 条事实，`outbox_events` 5 条；Signal 为
   `LONG / ARMED / version=1`，Policy 为 `APPROVED`，迁移为 `OBSERVING -> ARMED`。
 - `migrations/versions/20260716_0001_crypto_decision_persistence.sql`：已在 `loot_test` 真实执行；
   DBX 验证 10 张业务表、70 个显式业务约束、31 个索引（含 2 个 partial index）。
-- `& .\.venv\Scripts\python.exe scripts\check_context.py`：2026-07-24 复验通过，68 个 Markdown、
-  167 个本地链接，项目 Skill 与本机镜像一致。
+- `& .\.venv\Scripts\python.exe scripts\check_context.py`：2026-07-24 复验通过，71 个 Markdown、
+  176 个本地链接，项目 Skill 与本机镜像一致。
 
 完整环境初始化和验证命令见 [本地运行说明](../runbooks/local-run.md)。旧 macOS 验证结果
 保留在对应季度日志中，不再表述为当前机器已复验。
