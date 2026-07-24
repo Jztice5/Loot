@@ -577,7 +577,8 @@ InstrumentPolicy 和 Actionability 决定。未来持仓专属风险应使用独
 
 ## 15. Agent Context
 
-Context Builder只提供任务所需信息：
+四大机制的统一边界和流程见[智能决策闭环机制 V0.1](../runtime/intelligent-decision-loop-v0.1.md)。
+本文件只保留 Signal Monitoring 场景下的输入清单：
 
 - Market、Instrument和Session
 - WatchItem
@@ -931,7 +932,8 @@ Golden Case，不能直接复用 Crypto 输入数据和业务预期。
 
 ## 26. Codex Implementation Plan
 
-Codex应按以下顺序实施，不允许直接从UI或Agent开始：
+Codex应按以下顺序实施，不允许直接从UI或Agent开始。已完成的基础步骤不要求重做；后续
+需求按尚未完成的依赖继续推进：
 
 ### Step 1：Contracts
 
@@ -984,24 +986,25 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - timeout和audit
 - allowlist
 
-### Step 7：Agent and Policy
+### Step 7：Policy and Deterministic Application Flow
 
-- Context Builder
-- Market Agent接口
-- Decision Skill
 - DecisionProposal
 - mandatory guards
 - evaluation_request 和 DEFERRED re-evaluation
 - PolicyEvaluation 和 DecisionTicket 签发
 - AuthorizationRepository
 - DecisionTicket application
+- Run-Once 确定性应用服务
 
-### Step 8：Alert Loop
+### Step 8：Continuous Monitoring and Alert Loop
 
+- WatchItem 和 MonitoringSubscription 持久化身份
+- 常驻 Worker、Run 账本、并发锁和跨事务恢复
 - Signal Center读模型
 - Alert Policy
 - Notifier接口
 - FakeNotifier
+- 单一真实可见渠道
 - 用户ack和ignore
 
 ### Step 9：API and UI
@@ -1011,12 +1014,23 @@ Codex应按以下顺序实施，不允许直接从UI或Agent开始：
 - K线Signal标注
 - 快捷人工操作
 
-### Step 10：Real Provider and Replay Expansion
+### Step 10：Fact Retention and Replay Expansion
 
 - 扩展 OKX Provider 的历史缺口补拉和数据质量
+- 持久化 MarketBar、MarketSnapshot 和必要 Candidate 输入
 - 导入 Crypto 历史数据
 - 扩展 Crypto Golden Cases
 - 完成固定 Snapshot 到 Signal/Alert 的最小端到端 Replay
+- 建立结果标签和确定性规则基线评测
+
+### Step 11：Agent Shadow Evaluation
+
+- Context Builder 和输入预算
+- Market Agent接口和确定性路由边界
+- 只允许选择已注册、已授权的 Decision Skill
+- Agent 只生成 DecisionProposal，不创建 Ticket 或写 Signal
+- 使用相同 Replay 样本对比确定性基线
+- Shadow Mode 达到独立验收门槛前不影响正式 Signal 和 Alert
 
 ## 27. Rollout and Rollback
 

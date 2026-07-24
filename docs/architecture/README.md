@@ -25,6 +25,7 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 - [Loot 决策运行时与授权链路设计 V0.1](./runtime/decision-flow-v0.1.md)
 - [Loot Skill Runtime 设计 V0.1](./runtime/skill-runtime-v0.1.md)
 - [Loot Crypto Run-Once 应用闭环设计 V0.1](./runtime/crypto-run-once-v0.1.md)
+- [Loot 智能决策闭环机制 V0.1](./runtime/intelligent-decision-loop-v0.1.md)
 - [Loot Crypto 决策链路持久化设计 V0.1](./persistence/crypto-decision-persistence-v0.1.md)
 - [Loot Crypto 行情数据 Provider 设计文档 V0.1](./market-domains/crypto-market-data-provider-v0.1.md)
 - [Loot Crypto Structure PreFilter V0.1](./market-domains/crypto-prefilter-v0.1.md)

@@ -674,9 +674,10 @@ Loot/
 - Crypto Golden Case、方向特征和 PreFilter
 - Candidate、Evidence、DecisionProposal、PolicyEvaluation 和 DecisionTicket
 - Crypto Signal State Machine、持久化和幂等恢复
-- Market Agent 和受控 Skills 的最小实现
+- WatchItem、常驻监控运行和跨事务恢复
 - Signal 到 Alert 的单渠道端到端闭环
 - 固定 Snapshot 到 Signal/Alert 的最小 Replay
+- 确定性基线评测后，以 Shadow Mode 验证 Market Agent 和受控 Skills
 
 本阶段只允许实现 Crypto 市场业务。为 Crypto 闭环所需的 contracts、runtime、
 persistence 和 alert 可以沉淀在平台层，但不能基于尚未实现的美股或 A 股规则提前设计

@@ -18,7 +18,8 @@
 
 ## 当前执行与恢复点
 
-- 当前没有 In Progress 需求；下一项工作需要先在需求管理中登记。
+- 当前没有 In Progress 需求；`REQ-0014` 至 `REQ-0016` 已进入 Planned 队列，下一恢复点是
+  启动 `REQ-0014` 的组件设计与契约定义。
 - `REQ-0013` 已完成 demo/live Run-Once 应用服务、CLI、单元测试和 PostgreSQL 集成测试。
   手工 demo 事实已保留在 `loot_test`，复核入口见
   [过程记录](log/2026-Q3/2026-07-21-req-0013-crypto-run-once.md)。
@@ -35,7 +36,8 @@
 - Run-Once 只复用现有 10 张决策链表，不保存原始 K 线、MarketSnapshot 或 Candidate payload；
   这部分需要后续独立数据留存设计。
 - Skill Runtime 最小基线已实现；常驻 worker、跨事务恢复器、Agent、Alert 和最小 Replay
-  尚未实现。
+  尚未实现。Agent 明确延后到事实留存、最小 Replay 和确定性基线评测之后，并先以
+  Shadow Mode 引入。
 
 稳定边界、完整设计链和模块不变量只在 [AGENTS.md](../../AGENTS.md) 与
 [架构索引](../architecture/README.md) 维护。
