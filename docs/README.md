@@ -27,6 +27,7 @@
 - Runtime Console：[architecture/runtime/runtime-console-v0.1.md](architecture/runtime/runtime-console-v0.1.md)
 - 智能决策闭环机制：[architecture/runtime/intelligent-decision-loop-v0.1.md](architecture/runtime/intelligent-decision-loop-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
+- Crypto WatchItem 与监控订阅：[architecture/signal-monitoring/crypto-watchlist-monitoring-v0.1.md](architecture/signal-monitoring/crypto-watchlist-monitoring-v0.1.md)
 - Signal State Machine：[architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 - Crypto 行情数据 Provider：[architecture/market-domains/crypto-market-data-provider-v0.1.md](architecture/market-domains/crypto-market-data-provider-v0.1.md)
 - Crypto Structure PreFilter：[architecture/market-domains/crypto-prefilter-v0.1.md](architecture/market-domains/crypto-prefilter-v0.1.md)

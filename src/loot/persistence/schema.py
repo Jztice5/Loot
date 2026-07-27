@@ -39,6 +39,127 @@ SIGNAL_STATE_CHECK = (
     "'WEAKENING', 'INVALIDATED', 'RESOLVED', 'EXPIRED')"
 )
 
+INSTRUMENT_STATUS_CHECK = "status IN ('ACTIVE', 'PAUSED', 'DELISTED')"
+WATCH_ITEM_STATUS_CHECK = "status IN ('ACTIVE', 'PAUSED', 'ARCHIVED')"
+SUBSCRIPTION_STATUS_CHECK = (
+    "status IN ('ACTIVE', 'PAUSED', 'ARCHIVED', 'ERROR', 'DEGRADED')"
+)
+
+instruments = sa.Table(
+    "instruments",
+    metadata,
+    sa.Column("instrument_id", UUID, primary_key=True),
+    sa.Column("market", sa.String(24), nullable=False),
+    sa.Column("venue", sa.String(80), nullable=False),
+    sa.Column("symbol", sa.String(80), nullable=False),
+    sa.Column("instrument_type", sa.String(24), nullable=False),
+    sa.Column("quote_currency", sa.String(24), nullable=False),
+    sa.Column("timezone", sa.String(80), nullable=False),
+    sa.Column("price_scale", sa.Integer(), nullable=False),
+    sa.Column("status", sa.String(24), nullable=False),
+    sa.Column("payload_fingerprint", FINGERPRINT, nullable=False),
+    sa.Column("payload", JSONB, nullable=False),
+    sa.Column("inserted_at", UTC_TIMESTAMP, nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(MARKET_CHECK, name="market_values"),
+    sa.CheckConstraint(INSTRUMENT_STATUS_CHECK, name="status_values"),
+    sa.CheckConstraint("price_scale >= 0", name="price_scale_non_negative"),
+    sa.CheckConstraint(
+        "char_length(payload_fingerprint) = 64",
+        name="payload_fingerprint_length",
+    ),
+    sa.UniqueConstraint(
+        "market",
+        "venue",
+        "symbol",
+        "instrument_type",
+        name="uq_instruments_natural_identity",
+    ),
+)
+
+watch_items = sa.Table(
+    "watch_items",
+    metadata,
+    sa.Column("id", UUID, primary_key=True),
+    sa.Column("user_id", UUID, nullable=False),
+    sa.Column(
+        "instrument_id",
+        UUID,
+        sa.ForeignKey("loot.instruments.instrument_id"),
+        nullable=False,
+    ),
+    sa.Column("market", sa.String(24), nullable=False),
+    sa.Column("venue", sa.String(80), nullable=False),
+    sa.Column("status", sa.String(24), nullable=False),
+    sa.Column("monitoring_profile", sa.String(120), nullable=False),
+    sa.Column("priority", sa.String(16), nullable=False),
+    sa.Column("created_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("updated_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("version", sa.Integer(), nullable=False),
+    sa.Column("payload", JSONB, nullable=False),
+    sa.Column("inserted_at", UTC_TIMESTAMP, nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(MARKET_CHECK, name="market_values"),
+    sa.CheckConstraint(WATCH_ITEM_STATUS_CHECK, name="status_values"),
+    sa.CheckConstraint("version >= 0", name="version_non_negative"),
+    sa.CheckConstraint("updated_at >= created_at", name="updated_after_created"),
+)
+
+sa.Index(
+    "uq_watch_items_active_identity",
+    watch_items.c.user_id,
+    watch_items.c.instrument_id,
+    watch_items.c.monitoring_profile,
+    unique=True,
+    postgresql_where=watch_items.c.status == "ACTIVE",
+)
+
+sa.Index(
+    "ix_watch_items_instrument_id",
+    watch_items.c.instrument_id,
+)
+
+monitoring_subscriptions = sa.Table(
+    "monitoring_subscriptions",
+    metadata,
+    sa.Column("id", UUID, primary_key=True),
+    sa.Column(
+        "watch_item_id",
+        UUID,
+        sa.ForeignKey("loot.watch_items.id"),
+        nullable=False,
+    ),
+    sa.Column("market", sa.String(24), nullable=False),
+    sa.Column(
+        "instrument_id",
+        UUID,
+        sa.ForeignKey("loot.instruments.instrument_id"),
+        nullable=False,
+    ),
+    sa.Column("timeframe", sa.String(8), nullable=False),
+    sa.Column("route_key", sa.String(240), nullable=False),
+    sa.Column("next_run_at", UTC_TIMESTAMP),
+    sa.Column("status", sa.String(24), nullable=False),
+    sa.Column("config_version", sa.Integer(), nullable=False),
+    sa.Column("created_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("updated_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("payload", JSONB, nullable=False),
+    sa.Column("inserted_at", UTC_TIMESTAMP, nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(MARKET_CHECK, name="market_values"),
+    sa.CheckConstraint(SUBSCRIPTION_STATUS_CHECK, name="status_values"),
+    sa.CheckConstraint("config_version >= 1", name="config_version_positive"),
+    sa.CheckConstraint("updated_at >= created_at", name="updated_after_created"),
+    sa.UniqueConstraint(
+        "watch_item_id",
+        "timeframe",
+        name="uq_monitoring_subscriptions_watch_timeframe",
+    ),
+)
+
+sa.Index(
+    "ix_monitoring_subscriptions_active_schedule",
+    monitoring_subscriptions.c.status,
+    monitoring_subscriptions.c.next_run_at,
+)
+
 inbox_messages = sa.Table(
     "inbox_messages",
     metadata,

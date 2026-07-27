@@ -3,7 +3,7 @@
 ## 当前状态
 
 当前仓库已建立 Python 项目骨架、核心 contracts、Signal State Machine、Crypto 行情
-Provider、PostgreSQL 决策持久化和 Crypto Run-Once 入口。正式 API、常驻 worker 尚未启动，
+Provider、PostgreSQL 决策持久化、Crypto WatchItem 持久化和 Run-Once 入口。正式 API、常驻 worker 尚未启动，
 `main.py` 仍是示例入口。
 
 项目要求 Python 3.12+，依赖以 `pyproject.toml` 为准。首次克隆、切换设备或依赖变化后，
@@ -89,14 +89,9 @@ CI 和临时覆盖仍可使用 `LOOT_TEST_DATABASE_URL` 环境变量，且环境
 
 ## 预期基线
 
-未配置 PostgreSQL 测试连接时，当前预期基线为：
-
-```text
-82 passed, 8 skipped
-```
-
-配置 `%USERPROFILE%\.loot\database.env` 或 `LOOT_TEST_DATABASE_URL` 并可连接 `loot_test` 后，
-当前预期基线为 `90 passed`。数据库初始化和权限验证见
+测试数量会随需求推进变化，不在 Runbook 固化易过期的计数。配置
+`%USERPROFILE%\.loot\database.env` 或 `LOOT_TEST_DATABASE_URL` 并可连接 `loot_test` 后，
+全量测试不得出现失败；未执行最新 migration 时，对应集成测试会明确跳过或报告 schema 差异。数据库初始化和权限验证见
 [PostgreSQL SQL Migration 操作手册](postgresql-sql-migrations.md)。
 
 `main.py` 的当前预期输出：
@@ -157,25 +152,40 @@ okx.public_rest 2 BTC-USDT <close_price> True
 ## Crypto Run-Once
 
 Run-Once 只连接 `LOOT_TEST_DATABASE_URL` 指向的 `loot_test`。运行前需要完成本手册中的
-PostgreSQL 测试配置；命令会在任何写入前再次检查实际数据库名。
+PostgreSQL 测试配置和 `20260727_0002_crypto_watchlist_monitoring.sql`；命令会在任何写入前
+再次检查实际数据库名，并只接受数据库中 ACTIVE 的 Crypto H1 WatchItem。
+
+先创建持久化监控身份：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\manage_crypto_watch.py create
+```
+
+保存输出中的 `watch_item_id` 和 `watch_item_version`。暂停、恢复和归档示例：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\manage_crypto_watch.py pause --watch-item-id <UUID> --expected-version 0
+& .\.venv\Scripts\python.exe scripts\manage_crypto_watch.py resume --watch-item-id <UUID> --expected-version 1
+& .\.venv\Scripts\python.exe scripts\manage_crypto_watch.py archive --watch-item-id <UUID> --expected-version 2
+```
 
 Windows PowerShell：
 
 ```powershell
-& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode demo
-& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode live
+& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode demo --watch-item-id <UUID>
+& .\.venv\Scripts\python.exe scripts\run_crypto_once.py --mode live --watch-item-id <UUID>
 ```
 
 macOS/Linux：
 
 ```bash
-.venv/bin/python scripts/run_crypto_once.py --mode demo
-.venv/bin/python scripts/run_crypto_once.py --mode live
+.venv/bin/python scripts/run_crypto_once.py --mode demo --watch-item-id <UUID>
+.venv/bin/python scripts/run_crypto_once.py --mode live --watch-item-id <UUID>
 ```
 
 - `demo` 使用确定性 LONG 突破，预期返回 `SIGNAL_TRANSITIONED` 和 `ARMED`。
 - `live` 读取 OKX `BTC-USDT` 最近 4 根已收盘 H1 K 线；无突破时返回 `NO_CANDIDATE`。
-- 默认每次生成新的 `watch_item_id`；需要重用明确身份时传入 `--watch-item-id <UUID>`。
+- `--watch-item-id` 必填；PAUSED、ARCHIVED、非 Crypto、非 H1 或缺少订阅时会在访问 Provider 前拒绝。
 - 成功运行不会清理数据。使用输出中的 Candidate、Signal、Proposal、PolicyEvaluation 和
   DecisionTicket ID 在 DBX 的 `loot_test` / `loot` schema 做只读复核。
 - CLI 只输出稳定状态、原因和事实 ID；失败时不回显 DSN 或数据库驱动诊断。

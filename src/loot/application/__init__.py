@@ -9,6 +9,13 @@ from loot.application.crypto_run_once import (
     DemoBreakoutCryptoProvider,
     default_btc_usdt_instrument,
 )
+from loot.application.watchlist import (
+    ChangeWatchItemStatusCommand,
+    CreateCryptoWatchItemCommand,
+    CryptoRunConfiguration,
+    CryptoWatchlistService,
+    WatchlistMutationResult,
+)
 
 __all__ = [
     "CryptoRunMode",
@@ -18,4 +25,9 @@ __all__ = [
     "CryptoRunStatus",
     "DemoBreakoutCryptoProvider",
     "default_btc_usdt_instrument",
+    "ChangeWatchItemStatusCommand",
+    "CreateCryptoWatchItemCommand",
+    "CryptoRunConfiguration",
+    "CryptoWatchlistService",
+    "WatchlistMutationResult",
 ]

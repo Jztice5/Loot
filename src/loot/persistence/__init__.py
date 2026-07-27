@@ -15,6 +15,16 @@ from loot.persistence.outbox import (
     PostgresOutboxRepository,
 )
 from loot.persistence.signal_workflow import PostgresSignalWorkflow
+from loot.persistence.watchlist import (
+    ActiveWatchItemConflictError,
+    PostgresWatchlistRepository,
+    WatchItemNotFoundError,
+    WatchItemNotRunnableError,
+    WatchItemTransitionError,
+    WatchItemVersionConflictError,
+    WatchlistFactConflictError,
+    WatchlistPersistenceError,
+)
 
 __all__ = [
     "AnalysisFactConflictError",
@@ -27,5 +37,13 @@ __all__ = [
     "PostgresAuthorizationRepository",
     "PostgresOutboxRepository",
     "PostgresSignalWorkflow",
+    "ActiveWatchItemConflictError",
+    "PostgresWatchlistRepository",
+    "WatchItemNotFoundError",
+    "WatchItemNotRunnableError",
+    "WatchItemTransitionError",
+    "WatchItemVersionConflictError",
+    "WatchlistFactConflictError",
+    "WatchlistPersistenceError",
     "create_postgres_engine",
 ]

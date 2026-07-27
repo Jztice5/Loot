@@ -22,8 +22,11 @@ from loot.contracts import (
     DecisionProposal,
     DecisionTicket,
     EvidenceSet,
+    Instrument,
+    MonitoringSubscription,
     PolicyEvaluation,
     SignalInstance,
+    WatchItem,
 )
 from loot.contracts.serialization import json_compatible, payload_fingerprint
 
@@ -69,6 +72,64 @@ def evidence_values(evidence: EvidenceSet) -> dict[str, Any]:
         "dedupe_key": evidence.dedupe_key,
         "payload_fingerprint": payload_fingerprint(evidence),
         "payload": json_compatible(evidence),
+    }
+
+
+def instrument_values(instrument: Instrument) -> dict[str, Any]:
+    """生成不可变 Instrument 事实的数据库列值。"""
+
+    return {
+        "instrument_id": instrument.instrument_id,
+        "market": instrument.market.value,
+        "venue": instrument.venue,
+        "symbol": instrument.symbol,
+        "instrument_type": instrument.instrument_type.value,
+        "quote_currency": instrument.quote_currency,
+        "timezone": instrument.timezone,
+        "price_scale": instrument.price_scale,
+        "status": instrument.status.value,
+        "payload_fingerprint": payload_fingerprint(instrument),
+        "payload": json_compatible(instrument),
+    }
+
+
+def watch_item_values(watch_item: WatchItem) -> dict[str, Any]:
+    """生成 WatchItem 当前投影的数据库列值。"""
+
+    return {
+        "id": watch_item.id,
+        "user_id": watch_item.user_id,
+        "instrument_id": watch_item.instrument_id,
+        "market": watch_item.market.value,
+        "venue": watch_item.venue,
+        "status": watch_item.status.value,
+        "monitoring_profile": watch_item.monitoring_profile,
+        "priority": watch_item.priority.value,
+        "created_at": watch_item.created_at,
+        "updated_at": watch_item.updated_at,
+        "version": watch_item.version,
+        "payload": json_compatible(watch_item),
+    }
+
+
+def subscription_values(
+        subscription: MonitoringSubscription,
+) -> dict[str, Any]:
+    """生成 MonitoringSubscription 当前投影的数据库列值。"""
+
+    return {
+        "id": subscription.id,
+        "watch_item_id": subscription.watch_item_id,
+        "market": subscription.market.value,
+        "instrument_id": subscription.instrument_id,
+        "timeframe": subscription.timeframe.value,
+        "route_key": subscription.route_key,
+        "next_run_at": subscription.next_run_at,
+        "status": subscription.status.value,
+        "config_version": subscription.config_version,
+        "created_at": subscription.created_at,
+        "updated_at": subscription.updated_at,
+        "payload": json_compatible(subscription),
     }
 
 

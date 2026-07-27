@@ -32,6 +32,7 @@ Crypto 初版端到端闭环完成验收和复盘前，只实现 Crypto 市场�
 - [Loot Crypto Structure PreFilter V0.1](./market-domains/crypto-prefilter-v0.1.md)
 - [Loot Crypto Golden Cases V0.1](./testing/crypto-golden-cases-v0.1.md)
 - [Loot 自选与持仓信号监控闭环设计文档 V0.1](./signal-monitoring/signal-monitoring-loop-design-v0.1.md)
+- [Loot Crypto WatchItem 与 MonitoringSubscription V0.1](./signal-monitoring/crypto-watchlist-monitoring-v0.1.md)
 - [Loot Signal State Machine 设计文档 V0.1](./signal-state-machine/loot-signal-state-machine-v0.1.md)
 - [Loot 时间上下文模型 V0.1](./context/temporal-context-model-v0.1.md)
 

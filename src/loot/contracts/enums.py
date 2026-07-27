@@ -117,6 +117,7 @@ class MonitoringSubscriptionStatus(StrEnum):
 
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
+    ARCHIVED = "ARCHIVED"
     ERROR = "ERROR"
     DEGRADED = "DEGRADED"
 
