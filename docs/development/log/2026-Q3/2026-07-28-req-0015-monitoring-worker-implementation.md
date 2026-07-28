@@ -53,5 +53,5 @@ generation。收敛使用独立 `SignalExpiryEvent`、无 Ticket 的 `signal_tra
 `loot.crypto.SignalExpired` Outbox，不伪造、复用或消费 `DecisionTicket`，也不改变市场方向、
 Policy、持仓或 Actionability。
 
-需要由 `loot_migrator` 在 `loot_test` 先执行 `20260728_0004_signal_expiry_reconciliation.sql`，
-再运行 PostgreSQL 集成测试；该数据库验证尚未在本次记录时执行。
+`loot_migrator` 已在 `loot_test` 执行 `20260728_0004_signal_expiry_reconciliation.sql`。随后
+`tests/integration/test_crypto_decision_persistence.py` 为 8 passed，全量测试为 134 passed。

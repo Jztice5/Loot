@@ -33,7 +33,8 @@
 
 ## 验证证据
 
-- 全量：131 passed。
+- 全量：134 passed。
+- 过期 Signal 收敛集成测试：8 passed，覆盖无 Ticket 迁移、Outbox 和下一 generation。
 - PostgreSQL Worker 集成测试：3 passed。
 - Demo Worker：`COMPLETED / FINISHED / SIGNAL_TRANSITIONED`，完整事实链存在。
 - OKX public REST：4 根精确目标 H1 K 线全部闭合。
@@ -44,5 +45,5 @@
 
 - `--loop` 尚未部署为常驻系统进程，部署时仍需配置守护、日志采集和优雅停止。
 - 已过期但尚未进入终态的 Signal 会阻止新 generation；该问题已由 State Machine 的确定性
-  `expires_at` 收敛修复。Worker 仍不得通过直接写状态规避；首次使用前需执行 0004 SQL migration
-  并完成 PostgreSQL 集成回归。
+  `expires_at` 收敛修复。Worker 仍不得通过直接写状态规避；0004 SQL migration 已在 `loot_test`
+  执行，PostgreSQL 集成测试和全量回归已通过。

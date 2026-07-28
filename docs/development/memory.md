@@ -52,8 +52,8 @@
   隔离和 `--once/--loop`。当前未启动常驻进程；`--loop` 需要独立部署和进程守护配置。
 - 已实现 Signal State Machine 内部的确定性到期收敛：初始化新 setup 前在同一监控身份锁内检查
   最新 Signal，若 immutable `expires_at` 已到则写入 `EXPIRED`、独立 expiry 事件和 Outbox，再分配
-  下一 generation。Worker、Agent、Skill 和 Policy 仍不得直接写 Signal。`0004` migration 尚未在
-  `loot_test` 执行，执行前 PostgreSQL 集成回归保持阻塞。
+  下一 generation。Worker、Agent、Skill 和 Policy 仍不得直接写 Signal。`0004` 已在 `loot_test`
+  执行，并已完成 PostgreSQL 集成与全量回归。
 
 稳定边界、完整设计链和模块不变量只在 [AGENTS.md](../../AGENTS.md) 与
 [架构索引](../architecture/README.md) 维护。
@@ -73,9 +73,8 @@
 - `& .\.venv\Scripts\python.exe -m pytest -q tests\unit\signals\test_state_machine.py tests\unit\application\test_crypto_run_once.py`：
   22 passed，覆盖到期收敛、重复检测、下一 generation 和 Run-Once 时钟透传。
 - `& .\.venv\Scripts\python.exe -m pytest -q tests\integration\test_crypto_decision_persistence.py`：
-  6 passed、2 failed；失败符合迁移前预期，`loot.signal_transitions.decision_ticket_id` 仍为
-  `NOT NULL`。执行 `0004` 后必须重新运行该集成测试和全量测试。
-- `& .\.venv\Scripts\python.exe -m pytest -q`：131 passed。
+  8 passed，确认 `0004` 后无 Ticket 到期账本、Outbox 和下一 generation 均可持久化。
+- `& .\.venv\Scripts\python.exe -m pytest -q`：134 passed。
 - `& .\.venv\Scripts\python.exe -m pytest -q tests\integration\test_crypto_monitoring_worker.py`：
   3 passed，覆盖重复物化、工作流版本隔离、双 Worker claim、lease reclaim、退避和暂停取消。
 - `& .\.venv\Scripts\python.exe -m compileall -q src tests scripts`：通过。
