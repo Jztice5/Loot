@@ -16,7 +16,9 @@ Loot 是一个面向个人自选与手动持仓的多市场信号监控系统，
 - Agent 只能编排授权 Skill 并生成 DecisionProposal，不能直接写入 Signal、Position
   或交易指令。
 - Policy Gate 只有在批准 Proposal 后才能签发 DecisionTicket。
-- Signal State Machine 只消费已授权 DecisionTicket，是 Signal 状态唯一写入口。
+- Signal State Machine 默认只消费已授权 DecisionTicket，是 Signal 状态唯一写入口；唯一受限
+  例外是基于已持久化 `expires_at` 的确定性 `EXPIRED` 收敛，它不伪造或消费 Ticket，也不改变
+  市场方向、Policy 或持仓事实。
 - MarketSnapshot identity 必须绑定完整输入窗口；已闭合 K 线必须满足时间真实性。
 - Ticket 必须绑定授权时的 Signal 与业务上下文版本，状态机从事实源验证授权链。
 
@@ -28,6 +30,8 @@ Loot 是一个面向个人自选与手动持仓的多市场信号监控系统，
 - 系统宏观架构：[docs/architecture/system/loot-system-architecture-v0.1.md](docs/architecture/system/loot-system-architecture-v0.1.md)
 - 核心契约设计：[docs/architecture/contracts/loot-contracts-v0.1.md](docs/architecture/contracts/loot-contracts-v0.1.md)
 - 决策运行时与授权链路：[docs/architecture/runtime/decision-flow-v0.1.md](docs/architecture/runtime/decision-flow-v0.1.md)
+- Crypto 常驻监控 Worker：[docs/architecture/runtime/crypto-monitoring-worker-v0.1.md](docs/architecture/runtime/crypto-monitoring-worker-v0.1.md)
+- Runtime Console：[docs/architecture/runtime/runtime-console-v0.1.md](docs/architecture/runtime/runtime-console-v0.1.md)
 - Signal State Machine：[docs/architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](docs/architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 - 自选与持仓信号监控闭环：[docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Crypto 行情数据 Provider：[docs/architecture/market-domains/crypto-market-data-provider-v0.1.md](docs/architecture/market-domains/crypto-market-data-provider-v0.1.md)
