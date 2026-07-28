@@ -3,8 +3,8 @@
 ## 当前状态
 
 当前仓库已建立 Python 项目骨架、核心 contracts、Signal State Machine、Crypto 行情
-Provider、PostgreSQL 决策持久化、Crypto WatchItem 持久化和 Run-Once 入口。正式 API、常驻 worker 尚未启动，
-`main.py` 仍是示例入口。
+Provider、PostgreSQL 决策持久化、Crypto WatchItem 持久化、Run-Once 入口和 Crypto H1
+常驻 Worker。正式 API 尚未启动，`main.py` 仍是示例入口。
 
 项目要求 Python 3.12+，依赖以 `pyproject.toml` 为准。首次克隆、切换设备或依赖变化后，
 必须先执行环境初始化，不能直接复用旧 `.venv` 的历史状态。
@@ -189,6 +189,28 @@ macOS/Linux：
 - 成功运行不会清理数据。使用输出中的 Candidate、Signal、Proposal、PolicyEvaluation 和
   DecisionTicket ID 在 DBX 的 `loot_test` / `loot` schema 做只读复核。
 - CLI 只输出稳定状态、原因和事实 ID；失败时不回显 DSN 或数据库驱动诊断。
+
+## Crypto H1 Monitoring Worker
+
+运行前必须在 `loot_test` 执行 `20260728_0003_crypto_monitoring_runs.sql`，并保留至少一条
+ACTIVE Crypto H1 WatchItem/Subscription。Worker 每个 tick 先物化到期周期，再认领并执行至多一个 Run。
+
+Windows PowerShell 单次验收：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_crypto_worker.py --once --provider demo
+& .\.venv\Scripts\python.exe scripts\run_crypto_worker.py --once --provider live
+```
+
+常驻真实行情模式：
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_crypto_worker.py --loop --provider live --poll-seconds 10
+```
+
+macOS/Linux 将 Python 路径替换为 `.venv/bin/python`。`demo` 只允许 `--once`，不能用于常驻循环。
+进程中断后保留 Run 和 Attempt；重新启动会按租约、重试时间和原 Snapshot 身份恢复。输出不包含
+DSN、SQL 或完整 Provider payload。
 
 ## Runtime Console 只读观察台
 

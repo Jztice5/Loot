@@ -11,16 +11,19 @@
 - 已建立核心 contracts、Signal State Machine v0.1、Crypto 行情 Provider v0.1、
   Golden Cases V0.1、Crypto Structure PreFilter V0.1、Candidate 到 Signal 授权链路，
   REQ-0008 PostgreSQL 持久化、REQ-0013 Crypto Run-Once 可执行闭环、REQ-0014 Crypto
-  WatchItem 与 MonitoringSubscription 持久化基线，以及 REQ-0017 Runtime Console 只读观察台。
-- 正式单次运行入口为 `scripts/run_crypto_once.py`；`main.py` 仍是示例。核心代码位于
+  WatchItem 与 MonitoringSubscription 持久化基线、REQ-0015 Crypto H1 Worker，以及
+  REQ-0017 Runtime Console 只读观察台。
+- 正式单次运行入口为 `scripts/run_crypto_once.py`，Worker 入口为 `scripts/run_crypto_worker.py`；
+  `main.py` 仍是示例。核心代码位于
   `src/loot/application`、`src/loot/contracts`、`src/loot/runtime`、`src/loot/signals` 和
   `src/loot/domains/crypto`。
 - 需求状态与执行队列：[需求管理 2026-Q3](../planning/2026-Q3/需求管理-2026-Q3.md)。
 
 ## 当前执行与恢复点
 
-- 当前没有需求处于 In Progress；下一项计划为 `REQ-0015` Crypto 常驻监控 Worker 与运行恢复，
-  具体顺序以需求管理执行队列为准。
+- `REQ-0015` 已完成；0003 已在 `loot_test` 执行，常驻监控 Worker、Run/Attempt 账本、租约、
+  恢复阶段、精确 H1 Provider 和 CLI 已通过真实 PostgreSQL 验收。下一需求 `REQ-0016` 仍为
+  Planned，尚未进入实现。
 - `REQ-0014` 已完成 Crypto WatchItem、MonitoringSubscription 生命周期和 Run-Once 持久化
   身份接入；`loot_test` 保留一条 ACTIVE BTC-USDT H1 配置及其 LONG/ARMED demo 事实，详见
   [过程记录](log/2026-Q3/2026-07-27-req-0014-crypto-watchlist-monitoring.md)。
@@ -36,22 +39,28 @@
 
 ## 当前实现差异
 
-- PostgreSQL 持久化实现和两版 `loot_test` migration 已通过真实连接验收；`loot_app` 对
-  13 张业务表具备所需 DML 权限且不能在 `loot` schema 建表。`loot` schema owner 为
-  `loot_migrator`，13 张业务表 owner 仍为 `postgres`，这是当前非阻塞的运维差异。
+- PostgreSQL 持久化实现和三版 `loot_test` migration 已通过真实连接验收；`loot_app` 对
+  15 张业务表具备所需 DML 权限且不能在 `loot` schema 建表。`loot` schema owner 为
+  `loot_migrator`，既有表 owner 仍为 `postgres`，这是当前非阻塞的运维差异。
 - Run-Once 使用持久化 ACTIVE WatchItem 和 H1 Subscription，但仍不保存原始 K 线、
   MarketSnapshot 或 Candidate payload；
   这部分需要后续独立数据留存设计。
-- Skill Runtime 最小基线已实现；常驻 worker、跨事务恢复器、Agent、Alert 和最小 Replay
-  尚未实现。Agent 明确延后到事实留存、最小 Replay 和确定性基线评测之后，并先以
+- Skill Runtime 最小基线已实现；Agent、Alert 和最小 Replay 尚未实现。Agent 明确延后到
+  事实留存、最小 Replay 和确定性基线评测之后，并先以
   Shadow Mode 引入。
+- REQ-0015 已实现精确 H1 target、Run/Attempt、Snapshot 指纹绑定、lease reclaim、工作流版本
+  隔离和 `--once/--loop`。当前未启动常驻进程；`--loop` 需要独立部署和进程守护配置。
+- 已实现 Signal State Machine 内部的确定性到期收敛：初始化新 setup 前在同一监控身份锁内检查
+  最新 Signal，若 immutable `expires_at` 已到则写入 `EXPIRED`、独立 expiry 事件和 Outbox，再分配
+  下一 generation。Worker、Agent、Skill 和 Policy 仍不得直接写 Signal。`0004` migration 尚未在
+  `loot_test` 执行，执行前 PostgreSQL 集成回归保持阻塞。
 
 稳定边界、完整设计链和模块不变量只在 [AGENTS.md](../../AGENTS.md) 与
 [架构索引](../architecture/README.md) 维护。
 
 ## 当前验证基线
 
-代码验证日期：2026-07-27；上下文复验日期：2026-07-27。
+代码与上下文验证日期：2026-07-28。
 
 环境：
 
@@ -59,7 +68,24 @@
 - Codex bundled Python 3.12.13。
 - Git 基线：包含本条记录的当前分支 HEAD；具体提交以 `git log -1 --oneline` 实时结果为准。
 
-已实际执行：
+本轮已实际执行：
+
+- `& .\.venv\Scripts\python.exe -m pytest -q tests\unit\signals\test_state_machine.py tests\unit\application\test_crypto_run_once.py`：
+  22 passed，覆盖到期收敛、重复检测、下一 generation 和 Run-Once 时钟透传。
+- `& .\.venv\Scripts\python.exe -m pytest -q tests\integration\test_crypto_decision_persistence.py`：
+  6 passed、2 failed；失败符合迁移前预期，`loot.signal_transitions.decision_ticket_id` 仍为
+  `NOT NULL`。执行 `0004` 后必须重新运行该集成测试和全量测试。
+- `& .\.venv\Scripts\python.exe -m pytest -q`：131 passed。
+- `& .\.venv\Scripts\python.exe -m pytest -q tests\integration\test_crypto_monitoring_worker.py`：
+  3 passed，覆盖重复物化、工作流版本隔离、双 Worker claim、lease reclaim、退避和暂停取消。
+- `& .\.venv\Scripts\python.exe -m compileall -q src tests scripts`：通过。
+- Demo Worker：Run `3325fbcb-40a0-575a-a5f1-63ce2e4aa803` 完成，结果
+  `SIGNAL_TRANSITIONED / POLICY_APPROVED`；Proposal、Evaluation、Ticket、Signal、Transition
+  各 1 条，Attempt 1 条，Run Outbox 2 条。
+- OKX public REST 精确窗口复核：返回 4 根闭合 H1 K 线，目标与最新 `closed_at` 均为
+  `2026-07-28T07:00:00Z`，Snapshot `310f64f6-0936-5448-b30c-75919d97604d`。
+
+此前验证基线：
 
 - `& .\.venv\Scripts\python.exe -m pytest -q`：114 passed，0 failed，0 skipped。
 - `& .\.venv\Scripts\python.exe -m compileall -q src tests scripts migrations`：通过。

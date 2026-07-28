@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import json
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from loot.contracts import Instrument, InstrumentStatus, InstrumentType, Market, Timeframe
-from loot.domains.crypto import CryptoProviderError, FakeCryptoProvider, OkxRestCryptoProvider
+from loot.domains.crypto import (
+    CryptoProviderError,
+    CryptoTargetWindowUnavailableError,
+    FakeCryptoProvider,
+    OkxRestCryptoProvider,
+)
 
 
 def sample_crypto_instrument(*, venue: str = "OKX") -> Instrument:
@@ -88,6 +93,20 @@ class FakeCryptoProviderTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             provider.fetch_recent_bars(instrument, Timeframe.H1, limit=1)
+
+    def test_fake_provider_returns_exact_target_window(self) -> None:
+        target = datetime(2026, 7, 10, 8, 0, tzinfo=UTC)
+        provider = FakeCryptoProvider(received_at=target + timedelta(minutes=5))
+
+        snapshot = provider.fetch_bars_ending_at(
+            sample_crypto_instrument(venue="FAKE"),
+            Timeframe.H1,
+            target_bar_closed_at=target,
+            limit=4,
+        )
+
+        self.assertEqual(snapshot.bars[-1].closed_at, target)
+        self.assertTrue(all(bar.is_closed for bar in snapshot.bars))
 
 
 class OkxRestCryptoProviderTest(unittest.TestCase):
@@ -262,6 +281,53 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
             provider.fetch_recent_bars(
                 sample_crypto_instrument(venue="BINANCE"),
                 Timeframe.H1,
+                limit=1,
+            )
+
+    def test_okx_provider_returns_exact_historical_target_window(self) -> None:
+        captured: list[str] = []
+
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            captured.append(url)
+            return json.dumps(
+                {
+                    "code": "0",
+                    "msg": "",
+                    "data": [
+                        ["1720573200000", "106", "112", "101", "109", "11", "11", "1199", "1"],
+                        ["1720569600000", "100", "110", "95", "105", "10", "10", "1050", "1"],
+                    ],
+                }
+            ).encode("utf-8")
+
+        target = datetime(2024, 7, 10, 2, 0, tzinfo=UTC)
+        snapshot = OkxRestCryptoProvider(http_get=fake_http_get).fetch_bars_ending_at(
+            sample_crypto_instrument(),
+            Timeframe.H1,
+            target_bar_closed_at=target,
+            limit=2,
+        )
+
+        self.assertIn("/api/v5/market/history-candles?", captured[0])
+        self.assertIn("after=1720576800000", captured[0])
+        self.assertEqual(snapshot.bars[-1].closed_at, target)
+
+    def test_okx_provider_rejects_window_that_misses_target(self) -> None:
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            return json.dumps(
+                {
+                    "code": "0",
+                    "data": [
+                        ["1720569600000", "100", "110", "95", "105", "10", "10", "1050", "1"]
+                    ],
+                }
+            ).encode("utf-8")
+
+        with self.assertRaises(CryptoTargetWindowUnavailableError):
+            OkxRestCryptoProvider(http_get=fake_http_get).fetch_bars_ending_at(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                target_bar_closed_at=datetime(2024, 7, 10, 2, 0, tzinfo=UTC),
                 limit=1,
             )
 

@@ -25,6 +25,7 @@
 - 决策运行时与授权链路：[architecture/runtime/decision-flow-v0.1.md](architecture/runtime/decision-flow-v0.1.md)
 - Skill Runtime：[architecture/runtime/skill-runtime-v0.1.md](architecture/runtime/skill-runtime-v0.1.md)
 - Runtime Console：[architecture/runtime/runtime-console-v0.1.md](architecture/runtime/runtime-console-v0.1.md)
+- Crypto 常驻监控 Worker：[architecture/runtime/crypto-monitoring-worker-v0.1.md](architecture/runtime/crypto-monitoring-worker-v0.1.md)
 - 智能决策闭环机制：[architecture/runtime/intelligent-decision-loop-v0.1.md](architecture/runtime/intelligent-decision-loop-v0.1.md)
 - 自选与持仓信号监控闭环：[architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Crypto WatchItem 与监控订阅：[architecture/signal-monitoring/crypto-watchlist-monitoring-v0.1.md](architecture/signal-monitoring/crypto-watchlist-monitoring-v0.1.md)

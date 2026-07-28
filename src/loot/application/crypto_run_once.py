@@ -41,6 +41,7 @@ from loot.contracts import (
     Market,
     MarketBar,
     MarketSnapshot,
+    MonitoringRunPhase,
     SignalState,
     SignalType,
     Timeframe,
@@ -159,6 +160,21 @@ class CryptoRunOnceResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class CryptoRunCheckpoint:
+    """Run-Once 已提交阶段向外部恢复账本报告的事实身份。"""
+
+    phase: MonitoringRunPhase
+    snapshot_id: UUID
+    snapshot_content_hash: str
+    evaluated_at: datetime
+    candidate_id: UUID | None = None
+    signal_id: UUID | None = None
+    proposal_id: UUID | None = None
+    policy_evaluation_id: UUID | None = None
+    decision_ticket_id: UUID | None = None
+
+
 class _SignalWorkflow(Protocol):
     """Run-Once 依赖的 Signal 持久化端口。"""
 
@@ -167,6 +183,7 @@ class _SignalWorkflow(Protocol):
             request: SignalInitializationRequest,
             *,
             correlation_id: UUID,
+            detected_at: datetime | None = None,
     ) -> SignalInitializationResult:
         """初始化 OBSERVING Signal。"""
 
@@ -278,7 +295,36 @@ class DemoBreakoutCryptoProvider:
             include_unclosed=include_unclosed,
         )
 
-        # 2. 只重建触发 K 线，使其严格越过 PreFilter 的前三根参考上沿。
+        return self._with_breakout(baseline)
+
+    def fetch_bars_ending_at(
+            self,
+            instrument: Instrument,
+            timeframe: Timeframe,
+            *,
+            target_bar_closed_at: datetime,
+            limit: int,
+    ) -> MarketSnapshot:
+        """生成以精确目标 H1 收盘时间结束的演示突破窗口。"""
+
+        if limit < _MINIMUM_STRUCTURE_BARS:
+            raise ValueError("demo breakout requires at least 4 bars")
+        baseline = FakeCryptoProvider(
+            received_at=ensure_utc_datetime(self.received_at),
+            start_price=self.start_price,
+            step=self.step,
+        ).fetch_bars_ending_at(
+            instrument,
+            timeframe,
+            target_bar_closed_at=target_bar_closed_at,
+            limit=limit,
+        )
+        return self._with_breakout(baseline)
+
+    def _with_breakout(self, baseline: MarketSnapshot) -> MarketSnapshot:
+        """只重建触发 K 线，并重新计算完整 Snapshot 身份。"""
+
+        # 1. 只重建触发 K 线，使其严格越过 PreFilter 的前三根参考上沿。
         reference_bars = baseline.bars[-_MINIMUM_STRUCTURE_BARS:-1]
         reference_high = max(bar.high_price for bar in reference_bars)
         increment = max(abs(self.step), Decimal("1"))
@@ -293,7 +339,7 @@ class DemoBreakoutCryptoProvider:
             }
         )
 
-        # 3. 重新计算 Snapshot 内容指纹，避免修改行情事实后复用旧 snapshot_id。
+        # 2. 重新计算 Snapshot 内容指纹，避免修改行情事实后复用旧 snapshot_id。
         return MarketSnapshot.from_bars(
             market=baseline.market,
             instrument_id=baseline.instrument_id,
@@ -358,13 +404,41 @@ class CryptoRunOnceService:
             相同 Candidate 和上下文重试，Repository 会区分安全重投与 payload 冲突。
         """
 
-        # 1. 读取标准行情并执行确定性成本闸门；live 无突破时不产生 Signal 噪声。
+        # 1. CLI 读取最近窗口；常驻 Worker 改用 run_with_snapshot 传入精确目标。
         snapshot = self._provider.fetch_recent_bars(
             command.instrument,
             command.timeframe,
             limit=command.bar_limit,
             include_unclosed=False,
         )
+        return self.run_with_snapshot(command, snapshot)
+
+    def run_with_snapshot(
+            self,
+            command: CryptoRunOnceCommand,
+            snapshot: MarketSnapshot,
+            *,
+            evaluated_at: datetime | None = None,
+            on_checkpoint: Callable[[CryptoRunCheckpoint], None] | None = None,
+    ) -> CryptoRunOnceResult:
+        """消费已经绑定的 Snapshot 执行可恢复决策链。
+
+        业务场景:
+            常驻 Worker 按 target_bar_closed_at 预加载精确历史窗口，并在重试时复用首次绑定的
+            evaluated_at 和阶段身份。
+
+        调用链:
+            bound Snapshot -> PreFilter -> Signal initialization -> Analysis -> Policy -> Signal
+
+        幂等与补偿:
+            每个事实阶段提交后调用 on_checkpoint；若 checkpoint 持久化前崩溃，恢复调用使用
+            相同 run_id、Snapshot 和 evaluated_at 重投，既有 Repository 返回首次事实。
+        """
+
+        self._validate_snapshot(command, snapshot)
+        stable_evaluated_at = ensure_utc_datetime(evaluated_at or self._clock())
+
+        # 1. 对已绑定输入执行确定性成本闸门；无突破是正常完成，不产生 Signal 噪声。
         prefilter_result = self._prefilter.evaluate(
             CryptoPreFilterInput(
                 snapshot=snapshot,
@@ -373,12 +447,18 @@ class CryptoRunOnceService:
             )
         )
         candidate = prefilter_result.candidate
+        self._report_checkpoint(
+            on_checkpoint,
+            phase=MonitoringRunPhase.PREFILTERED,
+            snapshot=snapshot,
+            evaluated_at=stable_evaluated_at,
+            candidate_id=candidate.id if candidate is not None else None,
+        )
         if candidate is None:
             return self._no_candidate_result(command, snapshot, prefilter_result)
 
         # 2. 在创建 OBSERVING Signal 前拒绝过期候选，避免留下无法授权的活跃投影。
-        evaluated_at = ensure_utc_datetime(self._clock())
-        if evaluated_at >= candidate.expires_at:
+        if stable_evaluated_at >= candidate.expires_at:
             return CryptoRunOnceResult(
                 run_id=command.run_id,
                 mode=command.mode,
@@ -406,8 +486,17 @@ class CryptoRunOnceService:
                 expires_at=candidate.expires_at,
             ),
             correlation_id=_stage_id(command.run_id, "signal-initialize"),
+            detected_at=stable_evaluated_at,
         )
         signal = initialization.signal
+        self._report_checkpoint(
+            on_checkpoint,
+            phase=MonitoringRunPhase.SIGNAL_INITIALIZED,
+            snapshot=snapshot,
+            evaluated_at=stable_evaluated_at,
+            candidate_id=candidate.id,
+            signal_id=signal.id,
+        )
 
         # 4. 构建并原子保存 Evidence 和 Proposal；Candidate 作为 Inbox 消息来源参与指纹。
         build_result = self._decision_builder.build(
@@ -428,15 +517,24 @@ class CryptoRunOnceService:
                 "snapshot_content_hash": snapshot.snapshot_content_hash,
             },
             received_at=candidate.occurred_at,
-            processed_at=evaluated_at,
+            processed_at=stable_evaluated_at,
             evidence=(build_result.evidence,),
             proposal=build_result.proposal,
+        )
+        self._report_checkpoint(
+            on_checkpoint,
+            phase=MonitoringRunPhase.ANALYSIS_PERSISTED,
+            snapshot=snapshot,
+            evaluated_at=stable_evaluated_at,
+            candidate_id=candidate.id,
+            signal_id=signal.id,
+            proposal_id=build_result.proposal.id,
         )
 
         # 5. Policy Gate 复核完整事实链；应用层不能自行构造或补发 Ticket。
         authorization_expires_at = min(
             candidate.expires_at,
-            evaluated_at + timedelta(hours=1),
+            stable_evaluated_at + timedelta(hours=1),
         )
         policy_decision = self._policy_gate.evaluate(
             CryptoPolicyEvaluationRequest(
@@ -448,11 +546,24 @@ class CryptoRunOnceService:
                 watch_item_version=command.watch_item_version,
                 trading_plan_config_version=command.trading_plan_config_version,
                 position_version=command.position_version,
-                evaluated_at=evaluated_at,
+                evaluated_at=stable_evaluated_at,
                 authorization_expires_at=authorization_expires_at,
                 data_quality_ready=True,
                 market_rule_allows=True,
             )
+        )
+        self._report_checkpoint(
+            on_checkpoint,
+            phase=MonitoringRunPhase.POLICY_EVALUATED,
+            snapshot=snapshot,
+            evaluated_at=stable_evaluated_at,
+            candidate_id=candidate.id,
+            signal_id=signal.id,
+            proposal_id=build_result.proposal.id,
+            policy_evaluation_id=policy_decision.evaluation.id,
+            decision_ticket_id=(
+                policy_decision.ticket.id if policy_decision.ticket is not None else None
+            ),
         )
         if policy_decision.ticket is None:
             return self._policy_not_approved_result(
@@ -475,7 +586,18 @@ class CryptoRunOnceService:
                 position_version=command.position_version,
             ),
             correlation_id=_stage_id(command.run_id, "signal-transition"),
-            occurred_at=evaluated_at,
+            occurred_at=stable_evaluated_at,
+        )
+        self._report_checkpoint(
+            on_checkpoint,
+            phase=MonitoringRunPhase.SIGNAL_APPLIED,
+            snapshot=snapshot,
+            evaluated_at=stable_evaluated_at,
+            candidate_id=candidate.id,
+            signal_id=transition.signal.id,
+            proposal_id=build_result.proposal.id,
+            policy_evaluation_id=policy_decision.evaluation.id,
+            decision_ticket_id=policy_decision.ticket.id,
         )
         return CryptoRunOnceResult(
             run_id=command.run_id,
@@ -490,6 +612,53 @@ class CryptoRunOnceService:
             policy_evaluation_id=policy_decision.evaluation.id,
             decision_ticket_id=policy_decision.ticket.id,
             signal_state=transition.signal.state,
+        )
+
+    @staticmethod
+    def _validate_snapshot(
+            command: CryptoRunOnceCommand,
+            snapshot: MarketSnapshot,
+    ) -> None:
+        """拒绝跨标的、跨周期或包含未闭合 K 线的预加载输入。"""
+
+        if (
+                snapshot.market != Market.CRYPTO
+                or snapshot.instrument_id != command.instrument.instrument_id
+                or snapshot.timeframe != command.timeframe
+        ):
+            raise ValueError("preloaded snapshot does not match Run-Once command")
+        if any(not bar.is_closed for bar in snapshot.bars):
+            raise ValueError("Run-Once preloaded snapshot must contain only closed bars")
+
+    @staticmethod
+    def _report_checkpoint(
+            callback: Callable[[CryptoRunCheckpoint], None] | None,
+            *,
+            phase: MonitoringRunPhase,
+            snapshot: MarketSnapshot,
+            evaluated_at: datetime,
+            candidate_id: UUID | None = None,
+            signal_id: UUID | None = None,
+            proposal_id: UUID | None = None,
+            policy_evaluation_id: UUID | None = None,
+            decision_ticket_id: UUID | None = None,
+    ) -> None:
+        """在事实阶段提交后报告稳定身份；未配置回调时保持 Run-Once 兼容。"""
+
+        if callback is None:
+            return
+        callback(
+            CryptoRunCheckpoint(
+                phase=phase,
+                snapshot_id=snapshot.id,
+                snapshot_content_hash=snapshot.snapshot_content_hash,
+                evaluated_at=evaluated_at,
+                candidate_id=candidate_id,
+                signal_id=signal_id,
+                proposal_id=proposal_id,
+                policy_evaluation_id=policy_evaluation_id,
+                decision_ticket_id=decision_ticket_id,
+            )
         )
 
     @staticmethod

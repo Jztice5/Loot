@@ -160,6 +160,193 @@ sa.Index(
     monitoring_subscriptions.c.next_run_at,
 )
 
+monitoring_runs = sa.Table(
+    "monitoring_runs",
+    metadata,
+    sa.Column("id", UUID, primary_key=True),
+    sa.Column("run_key", sa.Text(), nullable=False, unique=True),
+    sa.Column(
+        "subscription_id",
+        UUID,
+        sa.ForeignKey("loot.monitoring_subscriptions.id"),
+        nullable=False,
+    ),
+    sa.Column("watch_item_id", UUID, sa.ForeignKey("loot.watch_items.id"), nullable=False),
+    sa.Column("instrument_id", UUID, sa.ForeignKey("loot.instruments.instrument_id"), nullable=False),
+    sa.Column("market", sa.String(24), nullable=False),
+    sa.Column("timeframe", sa.String(8), nullable=False),
+    sa.Column("target_bar_closed_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("workflow_version", sa.String(120), nullable=False),
+    sa.Column("execution_context_digest", FINGERPRINT, nullable=False),
+    sa.Column("watch_item_version", sa.Integer(), nullable=False),
+    sa.Column("subscription_config_version", sa.Integer(), nullable=False),
+    sa.Column("status", sa.String(24), nullable=False),
+    sa.Column("phase", sa.String(32), nullable=False),
+    sa.Column("outcome", sa.String(32)),
+    sa.Column("attempt_count", sa.Integer(), nullable=False),
+    sa.Column("max_attempts", sa.Integer(), nullable=False),
+    sa.Column("next_attempt_at", UTC_TIMESTAMP),
+    sa.Column("lease_token", UUID),
+    sa.Column("lease_owner", sa.String(160)),
+    sa.Column("lease_expires_at", UTC_TIMESTAMP),
+    sa.Column("input_snapshot_id", UUID),
+    sa.Column("snapshot_content_hash", FINGERPRINT),
+    sa.Column("source_provider", sa.String(120)),
+    sa.Column("decision_evaluated_at", UTC_TIMESTAMP),
+    sa.Column("candidate_id", UUID),
+    sa.Column("proposal_id", UUID),
+    sa.Column("policy_evaluation_id", UUID),
+    sa.Column("decision_ticket_id", UUID),
+    sa.Column("signal_id", UUID),
+    sa.Column("last_error_code", sa.String(120)),
+    sa.Column("created_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("updated_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("completed_at", UTC_TIMESTAMP),
+    sa.Column("version", sa.Integer(), nullable=False),
+    sa.Column("payload", JSONB, nullable=False),
+    sa.Column("inserted_at", UTC_TIMESTAMP, nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint("market = 'CRYPTO'", name="crypto_market_only"),
+    sa.CheckConstraint("timeframe = '1h'", name="h1_timeframe_only"),
+    sa.CheckConstraint(
+        "target_bar_closed_at = date_trunc('hour', target_bar_closed_at)",
+        name="target_exact_h1_boundary",
+    ),
+    sa.CheckConstraint(
+        "status IN ('PENDING', 'RUNNING', 'RETRY_WAIT', 'COMPLETED', 'FAILED', 'CANCELED')",
+        name="status_values",
+    ),
+    sa.CheckConstraint(
+        "phase IN ('MATERIALIZED', 'INPUT_BOUND', 'PREFILTERED', 'SIGNAL_INITIALIZED', "
+        "'ANALYSIS_PERSISTED', 'POLICY_EVALUATED', 'SIGNAL_APPLIED', 'FINISHED')",
+        name="phase_values",
+    ),
+    sa.CheckConstraint(
+        "outcome IS NULL OR outcome IN ('NO_CANDIDATE', 'CANDIDATE_EXPIRED', "
+        "'POLICY_NOT_APPROVED', 'SIGNAL_TRANSITIONED')",
+        name="outcome_values",
+    ),
+    sa.CheckConstraint("attempt_count >= 0 AND max_attempts >= 1", name="attempt_budget"),
+    sa.CheckConstraint("attempt_count <= max_attempts", name="attempt_within_budget"),
+    sa.CheckConstraint("watch_item_version >= 0", name="watch_version_non_negative"),
+    sa.CheckConstraint("subscription_config_version >= 1", name="subscription_version_positive"),
+    sa.CheckConstraint("version >= 0", name="version_non_negative"),
+    sa.CheckConstraint("updated_at >= created_at", name="updated_after_created"),
+    sa.CheckConstraint(
+        "char_length(execution_context_digest) = 64",
+        name="context_digest_length",
+    ),
+    sa.CheckConstraint(
+        "snapshot_content_hash IS NULL OR char_length(snapshot_content_hash) = 64",
+        name="snapshot_hash_length",
+    ),
+    sa.CheckConstraint(
+        "(status = 'RUNNING' AND lease_token IS NOT NULL AND lease_owner IS NOT NULL "
+        "AND lease_expires_at IS NOT NULL) OR (status <> 'RUNNING' AND lease_token IS NULL "
+        "AND lease_owner IS NULL AND lease_expires_at IS NULL)",
+        name="lease_matches_running",
+    ),
+    sa.CheckConstraint(
+        "(status = 'RETRY_WAIT') = (next_attempt_at IS NOT NULL)",
+        name="retry_has_next_attempt",
+    ),
+    sa.CheckConstraint(
+        "(status = 'COMPLETED') = (outcome IS NOT NULL)",
+        name="completed_has_outcome",
+    ),
+    sa.CheckConstraint(
+        "status <> 'COMPLETED' OR phase = 'FINISHED'",
+        name="completed_is_finished",
+    ),
+    sa.CheckConstraint(
+        "(status IN ('COMPLETED', 'FAILED', 'CANCELED')) = (completed_at IS NOT NULL)",
+        name="terminal_has_completed_at",
+    ),
+    sa.CheckConstraint(
+        "(input_snapshot_id IS NULL AND snapshot_content_hash IS NULL AND source_provider IS NULL) "
+        "OR (input_snapshot_id IS NOT NULL AND snapshot_content_hash IS NOT NULL "
+        "AND source_provider IS NOT NULL)",
+        name="snapshot_binding_complete",
+    ),
+    sa.CheckConstraint(
+        "phase = 'MATERIALIZED' OR input_snapshot_id IS NOT NULL",
+        name="advanced_phase_has_snapshot",
+    ),
+    sa.CheckConstraint(
+        "(input_snapshot_id IS NULL) = (decision_evaluated_at IS NULL)",
+        name="snapshot_has_evaluation_time",
+    ),
+    sa.CheckConstraint(
+        "phase <> 'FINISHED' OR status = 'COMPLETED'",
+        name="finished_phase_is_completed",
+    ),
+    sa.UniqueConstraint(
+        "subscription_id",
+        "target_bar_closed_at",
+        "workflow_version",
+        name="uq_monitoring_runs_subscription_target_workflow",
+    ),
+)
+
+sa.Index(
+    "ix_monitoring_runs_due",
+    monitoring_runs.c.status,
+    monitoring_runs.c.next_attempt_at,
+    monitoring_runs.c.target_bar_closed_at,
+)
+
+sa.Index(
+    "ix_monitoring_runs_expired_lease",
+    monitoring_runs.c.lease_expires_at,
+    postgresql_where=monitoring_runs.c.status == "RUNNING",
+)
+
+monitoring_run_attempts = sa.Table(
+    "monitoring_run_attempts",
+    metadata,
+    sa.Column("id", UUID, primary_key=True),
+    sa.Column(
+        "run_id",
+        UUID,
+        sa.ForeignKey("loot.monitoring_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("attempt_number", sa.Integer(), nullable=False),
+    sa.Column("lease_token", UUID, nullable=False),
+    sa.Column("worker_id", sa.String(160), nullable=False),
+    sa.Column("status", sa.String(24), nullable=False),
+    sa.Column("started_at", UTC_TIMESTAMP, nullable=False),
+    sa.Column("finished_at", UTC_TIMESTAMP),
+    sa.Column("error_code", sa.String(120)),
+    sa.Column("retryable", sa.Boolean()),
+    sa.Column("next_attempt_at", UTC_TIMESTAMP),
+    sa.Column("details", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
+    sa.CheckConstraint("attempt_number >= 1", name="attempt_number_positive"),
+    sa.CheckConstraint(
+        "status IN ('STARTED', 'COMPLETED', 'FAILED', 'ABANDONED')",
+        name="status_values",
+    ),
+    sa.CheckConstraint(
+        "(status = 'STARTED') = (finished_at IS NULL)",
+        name="started_has_no_finish",
+    ),
+    sa.CheckConstraint(
+        "(status = 'FAILED') = (error_code IS NOT NULL AND retryable IS NOT NULL)",
+        name="failure_metadata",
+    ),
+    sa.CheckConstraint(
+        "next_attempt_at IS NULL OR (status = 'FAILED' AND retryable IS TRUE)",
+        name="retry_schedule_matches_failure",
+    ),
+    sa.UniqueConstraint("run_id", "attempt_number", name="uq_monitoring_run_attempts_number"),
+    sa.UniqueConstraint("run_id", "lease_token", name="uq_monitoring_run_attempts_lease"),
+)
+
+sa.Index(
+    "ix_monitoring_run_attempts_run_started",
+    monitoring_run_attempts.c.run_id,
+    monitoring_run_attempts.c.started_at,
+)
+
 inbox_messages = sa.Table(
     "inbox_messages",
     metadata,
@@ -474,7 +661,7 @@ signal_transitions = sa.Table(
         "decision_ticket_id",
         UUID,
         sa.ForeignKey("loot.decision_tickets.id"),
-        nullable=False,
+        nullable=True,
     ),
     sa.Column("event_id", UUID, nullable=False, unique=True),
     sa.Column("from_state", sa.String(24), nullable=False),

@@ -166,6 +166,12 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
                         decision_tickets.c.id.in_(self.ticket_ids)
                     )
                 )
+            if self.signal_ids:
+                connection.execute(
+                    sa.delete(signal_transitions).where(
+                        signal_transitions.c.signal_id.in_(self.signal_ids)
+                    )
+                )
             if self.evaluation_ids:
                 connection.execute(
                     sa.delete(policy_evaluations).where(
@@ -482,6 +488,77 @@ class CryptoDecisionPersistenceIntegrationTest(unittest.TestCase):
         self.assertEqual(results[0].signal, results[1].signal)
         self.assertEqual(sorted(result.created for result in results), [False, True])
         self.assertEqual(results[0].signal.generation, 1)
+
+    def test_expired_signal_is_reconciled_before_next_generation(self) -> None:
+        """Persist a Ticket-free expiry fact before allocating the next generation."""
+
+        now = datetime(2026, 7, 28, 8, 0, tzinfo=UTC)
+        instrument_id = uuid4()
+        initial_correlation = uuid4()
+        next_correlation = uuid4()
+        self.correlation_ids.update((initial_correlation, next_correlation))
+        initial = self.signal_workflow.initialize(
+            SignalInitializationRequest(
+                watch_item_id=self.watch_item_id,
+                market=Market.CRYPTO,
+                instrument_id=instrument_id,
+                timeframe=Timeframe.H1,
+                signal_type=SignalType.MARKET_STRUCTURE,
+                direction=Direction.LONG,
+                priority=Priority.HIGH,
+                actionability=Actionability.WATCH_ONLY,
+                setup_key=f"expiring-{uuid4()}",
+                initialized_at=now - timedelta(hours=2),
+                expires_at=now - timedelta(hours=1),
+            ),
+            correlation_id=initial_correlation,
+        )
+        self.signal_ids.add(initial.signal.id)
+
+        next_generation = self.signal_workflow.initialize(
+            SignalInitializationRequest(
+                watch_item_id=self.watch_item_id,
+                market=Market.CRYPTO,
+                instrument_id=instrument_id,
+                timeframe=Timeframe.H1,
+                signal_type=SignalType.MARKET_STRUCTURE,
+                direction=Direction.LONG,
+                priority=Priority.HIGH,
+                actionability=Actionability.WATCH_ONLY,
+                setup_key=f"after-expiry-{uuid4()}",
+                initialized_at=now,
+            ),
+            correlation_id=next_correlation,
+            detected_at=now,
+        )
+        self.signal_ids.add(next_generation.signal.id)
+
+        expired = self.signal_workflow.get_signal(initial.signal.id)
+        assert expired is not None
+        self.assertEqual(expired.state, SignalState.EXPIRED)
+        self.assertEqual(expired.last_transition_at, initial.signal.expires_at)
+        self.assertEqual(next_generation.signal.generation, 2)
+
+        with self.engine.connect() as connection:
+            expiry_transition = connection.execute(
+                sa.select(signal_transitions).where(
+                    signal_transitions.c.signal_id == initial.signal.id
+                )
+            ).mappings().one()
+            expiry_outbox = connection.execute(
+                sa.select(outbox_events.c.event_type).where(
+                    outbox_events.c.correlation_id == next_correlation
+                )
+            ).scalars().all()
+            consumption_count = connection.execute(
+                sa.select(sa.func.count())
+                .select_from(decision_ticket_consumptions)
+                .where(decision_ticket_consumptions.c.signal_id == initial.signal.id)
+            ).scalar_one()
+        self.assertIsNone(expiry_transition["decision_ticket_id"])
+        self.assertEqual(expiry_transition["to_state"], SignalState.EXPIRED.value)
+        self.assertIn("loot.crypto.SignalExpired", expiry_outbox)
+        self.assertEqual(consumption_count, 0)
 
     def test_concurrent_policy_attempt_rejects_stale_writer(self) -> None:
         """Reject the Policy attempt computed before a concurrent commit."""

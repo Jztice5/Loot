@@ -283,6 +283,67 @@ class SignalStateMachineTest(unittest.TestCase):
         self.assertEqual(next_generation.signal.generation, 2)
         self.assertNotEqual(next_generation.signal.id, signal.id)
 
+    def test_expire_if_due_reconciles_signal_and_unblocks_next_generation(self) -> None:
+        """Expire an overdue Signal without manufacturing a DecisionTicket."""
+
+        now = aware_now()
+        signal = initialize_signal(
+            self.state_machine,
+            initialized_at=now - timedelta(hours=2),
+            expires_at=now - timedelta(hours=1),
+        )
+
+        result = self.state_machine.expire_if_due(signal, detected_at=now)
+
+        self.assertTrue(result.changed)
+        self.assertFalse(result.duplicate)
+        self.assertEqual(result.signal.state, SignalState.EXPIRED)
+        self.assertEqual(result.signal.version, signal.version + 1)
+        self.assertEqual(result.signal.last_transition_at, signal.expires_at)
+        self.assertIsNone(result.signal.latest_decision_ticket_id)
+        event = result.event
+        assert event is not None
+        self.assertEqual(event.from_state, SignalState.OBSERVING)
+        self.assertEqual(event.to_state, SignalState.EXPIRED)
+        self.assertEqual(event.expires_at, signal.expires_at)
+        self.assertEqual(event.detected_at, now)
+
+        duplicate = self.state_machine.expire_if_due(result.signal, detected_at=now)
+        self.assertFalse(duplicate.changed)
+        self.assertTrue(duplicate.duplicate)
+
+        next_generation = self.state_machine.initialize(
+            SignalInitializationRequest(
+                watch_item_id=signal.watch_item_id,
+                market=signal.market,
+                instrument_id=signal.instrument_id,
+                timeframe=signal.timeframe,
+                signal_type=signal.signal_type,
+                direction=signal.direction,
+                priority=signal.priority,
+                actionability=signal.actionability,
+                setup_key="btc-structure-after-expiry",
+                initialized_at=now,
+            )
+        )
+        self.assertEqual(next_generation.signal.generation, 2)
+
+    def test_expire_if_due_leaves_non_expired_signal_unchanged(self) -> None:
+        """Do not use expiry reconciliation before the Signal's own deadline."""
+
+        now = aware_now()
+        signal = initialize_signal(
+            self.state_machine,
+            initialized_at=now,
+            expires_at=now + timedelta(hours=1),
+        )
+
+        result = self.state_machine.expire_if_due(signal, detected_at=now)
+
+        self.assertFalse(result.changed)
+        self.assertFalse(result.duplicate)
+        self.assertEqual(result.signal, signal)
+
     def test_legal_transition_creates_traced_event(self) -> None:
         signal = initialize_signal(self.state_machine)
         proposal, evaluation, ticket = record_authorization(

@@ -65,6 +65,10 @@ class CryptoProviderError(RuntimeError):
     """Crypto 行情 Provider 错误。"""
 
 
+class CryptoTargetWindowUnavailableError(CryptoProviderError):
+    """Provider 尚未返回以指定闭合时间结束的完整行情窗口。"""
+
+
 class CryptoMarketDataProvider(Protocol):
     """Crypto 行情数据源接口。
 
@@ -107,6 +111,25 @@ class CryptoMarketDataProvider(Protocol):
 
         调用链:
             validate_instrument -> read_source -> normalize_bars -> build_snapshot
+        """
+
+        ...
+
+    def fetch_bars_ending_at(
+        self,
+        instrument: Instrument,
+        timeframe: Timeframe,
+        *,
+        target_bar_closed_at: datetime,
+        limit: int,
+    ) -> MarketSnapshot:
+        """读取以精确闭合时间结束的历史 K 线窗口。
+
+        业务点:
+            Worker 补跑历史周期时必须读取指定目标，不能用当前最新 K 线替代。
+
+        调用链:
+            MonitoringRun target -> Provider historical window -> MarketSnapshot
         """
 
         ...
@@ -161,6 +184,8 @@ class FakeCryptoProvider:
 
         _ensure_crypto_instrument(instrument)
         _ensure_limit(limit, max_limit=500)
+        # Fake 窗口只表达确定性已收盘事实；保留参数是为了满足统一 Provider 端口。
+        _ = include_unclosed
 
         duration = _timeframe_duration(timeframe)
         received_at = ensure_utc_datetime(self.received_at)
@@ -210,6 +235,33 @@ class FakeCryptoProvider:
             timeframe=timeframe,
             bars=bars,
             as_of=received_at,
+        )
+
+    def fetch_bars_ending_at(
+        self,
+        instrument: Instrument,
+        timeframe: Timeframe,
+        *,
+        target_bar_closed_at: datetime,
+        limit: int,
+    ) -> MarketSnapshot:
+        """生成以指定 H1 闭合时间结束的确定性历史窗口。"""
+
+        target = _ensure_h1_target(target_bar_closed_at, timeframe)
+        observed_at = ensure_utc_datetime(self.received_at)
+        if observed_at < target:
+            raise CryptoTargetWindowUnavailableError(
+                "fake provider has not observed the target closed bar"
+            )
+        return FakeCryptoProvider(
+            received_at=target,
+            start_price=self.start_price,
+            step=self.step,
+        ).fetch_recent_bars(
+            instrument,
+            timeframe,
+            limit=limit,
+            include_unclosed=False,
         )
 
 
@@ -314,6 +366,69 @@ class OkxRestCryptoProvider:
             as_of=received_at,
         )
 
+    def fetch_bars_ending_at(
+        self,
+        instrument: Instrument,
+        timeframe: Timeframe,
+        *,
+        target_bar_closed_at: datetime,
+        limit: int,
+    ) -> MarketSnapshot:
+        """读取以指定 H1 收盘时间结束的 OKX 历史窗口。
+
+        调用链:
+            validate target -> OKX history candles -> exact closed window -> Snapshot
+
+        业务规则:
+            结果最后一根 K 线必须精确闭合于 target_bar_closed_at；较新、较旧、未闭合或
+            数量不足都按暂时不可用拒绝，不能回退到最近窗口。
+        """
+
+        _ensure_crypto_instrument(instrument)
+        if instrument.venue.upper() != "OKX":
+            raise ValueError("OkxRestCryptoProvider only accepts venue=OKX instruments")
+        _ensure_limit(limit, max_limit=300)
+        target = _ensure_h1_target(target_bar_closed_at, timeframe)
+        query = urlencode(
+            {
+                "instId": instrument.symbol,
+                "bar": _okx_bar_code(timeframe),
+                "after": str(int(target.timestamp() * 1000)),
+                "limit": str(limit),
+            }
+        )
+        url = f"{self.base_url.rstrip('/')}/api/v5/market/history-candles?{query}"
+        raw_payload = (self.http_get or _default_http_get)(url, self.timeout_seconds)
+        payload = json.loads(raw_payload.decode("utf-8"))
+        rows = _okx_data_rows(payload)
+
+        received_at = datetime.now(UTC)
+        normalized_bars = [
+            self._parse_candle_row(
+                instrument,
+                timeframe,
+                row,
+                received_at=received_at,
+            )
+            for row in reversed(rows)
+        ]
+        bars = [
+            bar
+            for bar in normalized_bars
+            if bar.is_closed and bar.closed_at <= target
+        ][-limit:]
+        if len(bars) != limit or bars[-1].closed_at != target:
+            raise CryptoTargetWindowUnavailableError(
+                "OKX did not return the complete exact target window"
+            )
+        return _build_snapshot(
+            provider_name=self.provider_name,
+            instrument=instrument,
+            timeframe=timeframe,
+            bars=bars,
+            as_of=received_at,
+        )
+
     def _parse_candle_row(
         self,
         instrument: Instrument,
@@ -373,6 +488,34 @@ def _ensure_limit(limit: int, *, max_limit: int) -> None:
         raise ValueError("limit must be at least 1")
     if limit > max_limit:
         raise ValueError(f"limit must not exceed {max_limit}")
+
+
+def _ensure_h1_target(
+    target_bar_closed_at: datetime,
+    timeframe: Timeframe,
+) -> datetime:
+    """校验 V0.1 精确历史窗口只接受整点 H1 收盘目标。"""
+
+    target = ensure_utc_datetime(target_bar_closed_at)
+    if timeframe != Timeframe.H1:
+        raise ValueError("targeted Crypto provider v0.1 only supports H1")
+    if target.minute != 0 or target.second != 0 or target.microsecond != 0:
+        raise ValueError("target_bar_closed_at must be an exact H1 boundary")
+    return target
+
+
+def _okx_data_rows(payload: object) -> list[object]:
+    """校验 OKX 公共行情响应并返回原始数组行。"""
+
+    if not isinstance(payload, dict) or payload.get("code") != "0":
+        message = payload.get("msg") if isinstance(payload, dict) else None
+        raise CryptoProviderError(
+            f"OKX candles request failed: {message or 'unknown market data error'}"
+        )
+    rows = payload.get("data")
+    if not isinstance(rows, list) or not rows:
+        raise CryptoProviderError("OKX candles response did not include data rows")
+    return rows
 
 
 def _okx_request_limit(limit: int, *, include_unclosed: bool) -> int:

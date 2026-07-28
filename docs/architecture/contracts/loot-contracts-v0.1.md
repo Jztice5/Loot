@@ -95,7 +95,8 @@ REQ-0007 已完成统一迁移：`DecisionProposal` 只表达 Policy 前建议�
 - bars 按 opened_at 升序排列。
 - 同一 snapshot 内 provider_event_id 不能重复。
 - `latest_bar` 可能未收盘，策略默认应使用 `latest_closed_bar`。
-- snapshot_content_hash 基于 as_of 和完整有序 K 线窗口的 canonical 规范化事实生成。
+- snapshot_content_hash 基于完整有序 K 线窗口的 canonical 规范化市场输入生成；as_of 和
+  received_at 是采集审计时间，不进入业务输入指纹，避免同一历史窗口重抓时身份漂移。
 - snapshot_key 和 snapshot_id 必须绑定完整窗口内容；不同窗口长度、历史修正或闭合
   状态变化不得复用 identity。
 - as_of 不能早于任何已收盘 K 线的 closed_at。

@@ -28,6 +28,7 @@ from loot.contracts import (
     PolicyEvaluation,
     PolicyOutcome,
     Priority,
+    SignalExpiryEvent,
     SignalEvent,
     SignalInstance,
     SignalState,
@@ -157,6 +158,16 @@ class SignalTransitionResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SignalExpiryResult:
+    """确定性有效期收敛的状态机结果。"""
+
+    signal: SignalInstance
+    event: SignalExpiryEvent | None
+    changed: bool
+    duplicate: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class _AppliedDecisionRecord:
     """内存幂等账本中的首次 Ticket 指纹和迁移结果。"""
 
@@ -191,7 +202,8 @@ class SignalStateMachine:
         -> validate transition -> update projection -> build event -> remember result
 
     业务规则:
-        - 初始 OBSERVING 不需要 Ticket，后续每次状态变化必须有已授权 Ticket。
+        - 初始 OBSERVING 不需要 Ticket；后续状态变化默认必须有已授权 Ticket，只有基于
+          Signal 自身 immutable expires_at 的确定性 EXPIRED 收敛可以例外。
         - 同一 Ticket ID 只有完整 payload 一致时才返回首次结果。
         - direction、Signal 版本和业务上下文版本不一致时拒绝迁移。
         - 所有投影更新通过完整 Pydantic 校验重建。
@@ -436,6 +448,71 @@ class SignalStateMachine:
             result,
         )
         return result
+
+    def expire_if_due(
+            self,
+            current_signal: SignalInstance,
+            *,
+            detected_at: datetime,
+            event_id: UUID | None = None,
+    ) -> SignalExpiryResult:
+        """基于 Signal 自身 immutable ``expires_at`` 收敛到 ``EXPIRED``。
+
+        调用链:
+            workflow lock/load -> restore_projection -> expire_if_due -> persist expiry fact
+
+        该方法是 Ticket-only 状态迁移规则的唯一时间型例外。它不读取或改写 Policy、
+        市场方向、持仓和授权事实；只有非终态 Signal 的自身 expires_at 已到达时才允许迁移。
+        """
+
+        self._ensure_current_projection(current_signal)
+        normalized_detected_at = ensure_utc_datetime(detected_at)
+        if (
+                current_signal.state in _TERMINAL_STATES
+                or current_signal.expires_at is None
+                or current_signal.expires_at > normalized_detected_at
+        ):
+            return SignalExpiryResult(
+                signal=current_signal,
+                event=None,
+                changed=False,
+                duplicate=current_signal.state == SignalState.EXPIRED,
+            )
+
+        if not self.can_transition(current_signal.state, SignalState.EXPIRED):
+            raise InvalidSignalTransitionError(current_signal.state, SignalState.EXPIRED)
+
+        expiry_time = current_signal.expires_at
+        updated_payload = current_signal.model_dump()
+        updated_payload.update(
+            {
+                "state": SignalState.EXPIRED,
+                "last_transition_at": expiry_time,
+                "version": current_signal.version + 1,
+            }
+        )
+        updated_signal = SignalInstance.model_validate(updated_payload)
+        resolved_event_id = event_id or uuid5(
+            NAMESPACE_URL,
+            f"signal-expired:{current_signal.id}:{expiry_time.isoformat()}",
+        )
+        event = SignalExpiryEvent(
+            event_id=resolved_event_id,
+            signal_id=current_signal.id,
+            market=current_signal.market,
+            instrument_id=current_signal.instrument_id,
+            signal_type=current_signal.signal_type,
+            direction=current_signal.direction,
+            from_state=current_signal.state,
+            to_state=SignalState.EXPIRED,
+            expires_at=expiry_time,
+            detected_at=normalized_detected_at,
+            dedupe_key=(
+                f"{current_signal.dedupe_key}:expired:{expiry_time.isoformat()}"
+            ),
+        )
+        self._register_signal(updated_signal)
+        return SignalExpiryResult(signal=updated_signal, event=event, changed=True)
 
     def applied_decision_count(self) -> int:
         """返回当前内存幂等账本中已消费的 DecisionTicket 数量。"""

@@ -24,6 +24,18 @@ from loot.contracts.events import EventEnvelope
 from loot.contracts.market import Instrument, PriceZone
 from loot.contracts.market_data import MarketBar, MarketBarClosedEvent, MarketSnapshot
 from loot.contracts.monitoring import CandidateEvent, MonitoringSubscription
+from loot.contracts.monitoring_run import (
+    CRYPTO_MONITORING_WORKFLOW_VERSION,
+    MonitoringAttemptStatus,
+    MonitoringRun,
+    MonitoringRunAttempt,
+    MonitoringRunOutcome,
+    MonitoringRunPhase,
+    MonitoringRunStatus,
+    monitoring_execution_context_digest,
+    monitoring_run_id,
+    monitoring_run_key,
+)
 from loot.contracts.portfolio import (
     Position,
     PositionEvent,
@@ -37,6 +49,7 @@ from loot.contracts.signals import (
     EvidenceSet,
     PolicyEvaluation,
     PolicyGuardResult,
+    SignalExpiryEvent,
     SignalEvent,
     SignalInstance,
 )
@@ -44,6 +57,7 @@ from loot.contracts.signals import (
 __all__ = [
     "Actionability",
     "CandidateEvent",
+    "CRYPTO_MONITORING_WORKFLOW_VERSION",
     "CandidateType",
     "DecisionProposal",
     "DecisionTicket",
@@ -60,6 +74,12 @@ __all__ = [
     "MarketSnapshot",
     "MonitoringSubscription",
     "MonitoringSubscriptionStatus",
+    "MonitoringAttemptStatus",
+    "MonitoringRun",
+    "MonitoringRunAttempt",
+    "MonitoringRunOutcome",
+    "MonitoringRunPhase",
+    "MonitoringRunStatus",
     "Position",
     "PositionEvent",
     "PositionEventType",
@@ -71,6 +91,7 @@ __all__ = [
     "PriceZone",
     "Priority",
     "SignalEvent",
+    "SignalExpiryEvent",
     "SignalInstance",
     "SignalState",
     "SignalType",
@@ -80,4 +101,7 @@ __all__ = [
     "VersionedCondition",
     "WatchItem",
     "WatchItemStatus",
+    "monitoring_execution_context_digest",
+    "monitoring_run_id",
+    "monitoring_run_key",
 ]

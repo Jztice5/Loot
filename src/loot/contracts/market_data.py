@@ -137,20 +137,20 @@ def _calculate_snapshot_content_hash(
     market: Market,
     instrument_id: UUID,
     timeframe: Timeframe,
-    as_of: datetime,
     bars: Iterable[MarketBar],
 ) -> str:
     """根据完整规范化行情窗口计算 SHA-256 内容指纹。
 
     业务点:
-        排除派生 UUID，保留 Provider、标的、周期、as_of 和全部 K 线事实；数值先消除
-        Decimal 尾随零差异，时间先归一化为 UTC。
+        排除派生 UUID 和采集时钟，保留 Provider、标的、周期和全部市场输入事实；数值先
+        消除 Decimal 尾随零差异，市场时间先归一化为 UTC。
 
     调用链:
         MarketSnapshot.from_bars/model_validator -> canonical JSON -> SHA-256
 
     幂等逻辑:
-        相同事实得到相同指纹；窗口长度、历史内容、闭合状态或接收时间变化都会改变指纹。
+        相同市场输入得到相同指纹；窗口长度、历史内容或闭合状态变化会改变指纹；仅
+        as_of/received_at 采集时间变化不会把正常重试误判为行情修正。
     """
 
     ordered_bars = sorted(bars, key=lambda bar: bar.opened_at)
@@ -159,7 +159,6 @@ def _calculate_snapshot_content_hash(
         "market": market.value,
         "instrument_id": str(instrument_id),
         "timeframe": timeframe.value,
-        "as_of": _canonical_datetime(as_of),
         "bars": [
             {
                 "provider": bar.provider,
@@ -178,7 +177,6 @@ def _calculate_snapshot_content_hash(
                 "volume": _canonical_decimal(bar.volume),
                 "quote_volume": _canonical_decimal(bar.quote_volume),
                 "is_closed": bar.is_closed,
-                "received_at": _canonical_datetime(bar.received_at),
             }
             for bar in ordered_bars
         ],
@@ -269,7 +267,6 @@ class MarketSnapshot(ContractModel):
             market=market,
             instrument_id=instrument_id,
             timeframe=timeframe,
-            as_of=normalized_as_of,
             bars=ordered_bars,
         )
         snapshot_key = _build_snapshot_key(
@@ -364,7 +361,6 @@ class MarketSnapshot(ContractModel):
             market=self.market,
             instrument_id=self.instrument_id,
             timeframe=self.timeframe,
-            as_of=self.as_of,
             bars=self.bars,
         )
         if self.snapshot_content_hash != expected_hash:

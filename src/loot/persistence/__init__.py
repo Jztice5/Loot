@@ -14,6 +14,22 @@ from loot.persistence.outbox import (
     OutboxMessage,
     PostgresOutboxRepository,
 )
+from loot.application.monitoring import (
+    MonitoringConfigurationInactiveError,
+    MonitoringFactConflictError,
+    MonitoringInputChangedError,
+    MonitoringLeaseLostError,
+    MonitoringPersistenceError,
+    MonitoringRunNotFoundError,
+)
+from loot.persistence.monitoring import (
+    DEFAULT_AVAILABILITY_DELAY,
+    DEFAULT_LEASE_DURATION,
+    DEFAULT_MAX_ATTEMPTS,
+    DEFAULT_MAX_CATCH_UP,
+    DEFAULT_WORKFLOW_VERSION,
+    PostgresMonitoringRepository,
+)
 from loot.persistence.signal_workflow import PostgresSignalWorkflow
 from loot.persistence.watchlist import (
     ActiveWatchItemConflictError,
@@ -36,9 +52,21 @@ __all__ = [
     "PostgresAnalysisRepository",
     "PostgresAuthorizationRepository",
     "PostgresOutboxRepository",
+    "PostgresMonitoringRepository",
     "PostgresSignalWorkflow",
     "ActiveWatchItemConflictError",
     "PostgresWatchlistRepository",
+    "DEFAULT_AVAILABILITY_DELAY",
+    "DEFAULT_LEASE_DURATION",
+    "DEFAULT_MAX_ATTEMPTS",
+    "DEFAULT_MAX_CATCH_UP",
+    "DEFAULT_WORKFLOW_VERSION",
+    "MonitoringConfigurationInactiveError",
+    "MonitoringFactConflictError",
+    "MonitoringInputChangedError",
+    "MonitoringLeaseLostError",
+    "MonitoringPersistenceError",
+    "MonitoringRunNotFoundError",
     "WatchItemNotFoundError",
     "WatchItemNotRunnableError",
     "WatchItemTransitionError",

@@ -1,6 +1,7 @@
 """Loot application services."""
 
 from loot.application.crypto_run_once import (
+    CryptoRunCheckpoint,
     CryptoRunMode,
     CryptoRunOnceCommand,
     CryptoRunOnceResult,
@@ -16,8 +17,20 @@ from loot.application.watchlist import (
     CryptoWatchlistService,
     WatchlistMutationResult,
 )
+from loot.application.monitoring import (
+    CryptoMonitoringWorker,
+    MonitoringConfigurationInactiveError,
+    MonitoringFactConflictError,
+    MonitoringInputChangedError,
+    MonitoringLeaseLostError,
+    MonitoringPersistenceError,
+    MonitoringRunNotFoundError,
+    MonitoringWorkerTickResult,
+    MonitoringWorkerTickStatus,
+)
 
 __all__ = [
+    "CryptoRunCheckpoint",
     "CryptoRunMode",
     "CryptoRunOnceCommand",
     "CryptoRunOnceResult",
@@ -30,4 +43,13 @@ __all__ = [
     "CryptoRunConfiguration",
     "CryptoWatchlistService",
     "WatchlistMutationResult",
+    "CryptoMonitoringWorker",
+    "MonitoringConfigurationInactiveError",
+    "MonitoringFactConflictError",
+    "MonitoringInputChangedError",
+    "MonitoringLeaseLostError",
+    "MonitoringPersistenceError",
+    "MonitoringRunNotFoundError",
+    "MonitoringWorkerTickResult",
+    "MonitoringWorkerTickStatus",
 ]
