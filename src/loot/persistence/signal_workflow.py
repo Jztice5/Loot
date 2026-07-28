@@ -31,7 +31,12 @@ import sqlalchemy as sa
 from sqlalchemy import Engine
 from sqlalchemy.engine import Connection
 
-from loot.contracts import DecisionTicket, SignalEvent, SignalInstance, SignalState
+from loot.contracts import (
+    DecisionTicket,
+    SignalEvent,
+    SignalInstance,
+    SignalState,
+)
 from loot.contracts.base import ensure_non_empty, ensure_utc_datetime
 from loot.contracts.serialization import json_compatible, payload_fingerprint
 from loot.persistence.authorization import PostgresAuthorizationRepository
@@ -51,6 +56,7 @@ from loot.signals import (
     AuthorizationFacts,
     DuplicateDecisionConflictError,
     SignalAuthorizationContext,
+    SignalExpiryResult,
     SignalInitializationConflictError,
     SignalInitializationRequest,
     SignalInitializationResult,
@@ -120,6 +126,7 @@ class PostgresSignalWorkflow:
             request: SignalInitializationRequest,
             *,
             correlation_id: UUID,
+            detected_at: datetime | None = None,
     ) -> SignalInitializationResult:
         """幂等初始化数据库中的 OBSERVING Signal generation。
 
@@ -142,6 +149,7 @@ class PostgresSignalWorkflow:
                 else None
             ),
         )
+        expiry_detection_time = ensure_utc_datetime(detected_at or datetime.now(UTC))
         identity_values = self._request_identity_values(normalized_request)
         identity_key = self._identity_lock_key(identity_values)
         with self._engine.begin() as connection:
@@ -170,6 +178,21 @@ class PostgresSignalWorkflow:
                 identity_values,
                 for_update=True,
             )
+            if latest is not None:
+                state_machine = SignalStateMachine(self._authorization_repository)
+                state_machine.restore_projection(latest)
+                expiry_result = state_machine.expire_if_due(
+                    latest,
+                    detected_at=expiry_detection_time,
+                )
+                if expiry_result.changed:
+                    self._persist_expiry_result(
+                        connection,
+                        previous_signal=latest,
+                        result=expiry_result,
+                        correlation_id=correlation_id,
+                    )
+                    latest = expiry_result.signal
             if latest is not None and latest.state not in _TERMINAL_STATES:
                 raise SignalInitializationConflictError(
                     "active signal already exists for the monitoring identity"
@@ -336,6 +359,72 @@ class PostgresSignalWorkflow:
                     "ticket_fingerprint": ticket_fingerprint,
                 },
                 occurred_at=event.occurred_at,
+            ),
+        )
+        return transition_id
+
+    @staticmethod
+    def _persist_expiry_result(
+            connection: Connection,
+            *,
+            previous_signal: SignalInstance,
+            result: SignalExpiryResult,
+            correlation_id: UUID,
+    ) -> UUID | None:
+        """持久化状态机产生的确定性到期事实，不创建或消费 DecisionTicket。"""
+
+        if not result.changed:
+            return None
+        event = result.event
+        if event is None:
+            raise ValueError("changed expiry transition requires SignalExpiryEvent")
+
+        updated_values = signal_values(result.signal)
+        updated_values.pop("id")
+        update_result = connection.execute(
+            sa.update(signal_instances)
+            .where(
+                signal_instances.c.id == previous_signal.id,
+                signal_instances.c.version == previous_signal.version,
+            )
+            .values(**updated_values, updated_at=event.detected_at)
+        )
+        if update_result.rowcount != 1:
+            raise SignalVersionConflictError(
+                "signal projection changed before deterministic expiry update"
+            )
+
+        transition_id = uuid5(
+            NAMESPACE_URL,
+            f"signal-expiry-transition-fact:{event.event_id}",
+        )
+        connection.execute(
+            sa.insert(signal_transitions).values(
+                id=transition_id,
+                signal_id=result.signal.id,
+                decision_ticket_id=None,
+                event_id=event.event_id,
+                from_state=previous_signal.state.value,
+                to_state=result.signal.state.value,
+                from_version=previous_signal.version,
+                to_version=result.signal.version,
+                occurred_at=event.expires_at,
+                payload=json_compatible(event),
+            )
+        )
+        insert_outbox_message(
+            connection,
+            build_outbox_message(
+                event_id=event.event_id,
+                event_type="loot.crypto.SignalExpired",
+                producer="loot.persistence.signal_workflow",
+                aggregate_type="SignalInstance",
+                aggregate_id=result.signal.id,
+                correlation_id=correlation_id,
+                causation_id=None,
+                partition_key=str(result.signal.id),
+                payload={"signal_expiry_event": json_compatible(event)},
+                occurred_at=event.expires_at,
             ),
         )
         return transition_id

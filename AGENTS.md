@@ -66,15 +66,18 @@ Loot 是面向个人自选与手动持仓的多市场信号监控系统，覆盖
    DecisionTicket、改变 Signal 状态、修改持仓或发送交易指令。
 4. Skill 必须具有强类型输入输出、版本、市场范围、超时和权限声明。
 5. Policy Gate 不可绕过；它必须记录 PolicyEvaluation，只有批准时才能签发
-   DecisionTicket；Signal State Machine 负责初始 OBSERVING Signal 的幂等创建，并且只
-   消费已授权 Ticket 执行后续迁移，是信号状态的唯一写入入口。
+   DecisionTicket；Signal State Machine 负责初始 OBSERVING Signal 的幂等创建，并且默认只
+   消费已授权 Ticket 执行后续迁移，是信号状态的唯一写入入口。唯一例外是它基于已持久化
+   Signal 自身 immutable `expires_at` 执行确定性 `EXPIRED` 收敛：不得读取或改写市场判断、
+   Policy、持仓或方向，必须留下独立审计事件，且不得伪造或消费 Ticket。
 6. 自选和持仓由用户手动维护。持仓变化必须追加 PositionEvent，不能通过覆盖历史掩盖操作过程。
 7. PostgreSQL 是业务状态事实源；Redis 只承担缓存、锁和事件流。
 8. 所有消费者按至少一次投递设计，必须实现幂等。
 9. 内部时间统一使用 UTC，展示层转换为市场或用户时区。
 10. V1 不实现自动交易、券商同步、全市场扫描或高频交易。
 11. MarketSnapshot identity 必须绑定完整有序输入窗口内容；不同窗口、历史修正或闭合
-    状态变化不得复用 snapshot_id。
+    状态变化不得复用 snapshot_id；as_of 和 received_at 只表达采集审计时间，不进入业务
+    输入指纹，避免同一历史窗口重抓时身份漂移。
 12. `is_closed=True` 的 MarketBar 必须满足 `received_at >= closed_at`，PreFilter 不得
     消费时间上尚未闭合的 K 线。
 13. Signal State Machine 必须通过事实仓库端口验证 APPROVED PolicyEvaluation、
@@ -93,6 +96,12 @@ Loot 是面向个人自选与手动持仓的多市场信号监控系统，覆盖
     完成验收和复盘前，不实现 US Equity 或 A-Share 的 Provider、领域规则、Agent、
     Skills、Policy 和 Signal 业务逻辑，也不为尚未验证的跨市场复用提前抽象业务规则。
     Crypto 闭环稳定后，先提炼已验证的平台能力，再分别启动另外两个 bounded context。
+18. Crypto MonitoringRun identity 必须绑定 `subscription_id + target_bar_closed_at +
+    workflow_version`。Worker 只能消费 `closed_at` 精确匹配目标且时间上已闭合的 K 线窗口；
+    首次 Snapshot identity/content hash 绑定后，重试不得在同一 run_id 下静默更换输入。
+19. Worker lease 只表达当前执行所有权，不能替代 Candidate、Proposal、Ticket、Signal 和
+    Outbox 的业务幂等。`NO_CANDIDATE` 是正常完成；PAUSED/ARCHIVED 阻止新 Run，但不删除或
+    回滚已经 RUNNING 和已提交的事实。
 
 ## Module Boundaries
 

@@ -51,16 +51,34 @@ class MonitoringSubscription(ContractModel):
     next_run_at: datetime | None = None
     status: MonitoringSubscriptionStatus
     config_version: int = Field(ge=1)
+    created_at: datetime
+    updated_at: datetime
 
     @field_validator("route_key")
     @classmethod
     def _route_key_is_present(cls, value: str) -> str:
         return ensure_non_empty(value)
 
-    @field_validator("next_run_at")
+    @field_validator("next_run_at", "created_at", "updated_at")
     @classmethod
-    def _next_run_at_is_utc(cls, value: datetime | None) -> datetime | None:
+    def _timestamps_are_utc(cls, value: datetime | None) -> datetime | None:
         return ensure_utc_datetime(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def _subscription_is_consistent(self) -> "MonitoringSubscription":
+        """校验订阅时间和市场路由不可被伪造。"""
+
+        if self.updated_at < self.created_at:
+            raise ValueError("updated_at must not be earlier than created_at")
+        if self.market == Market.CRYPTO:
+            expected_route_key = (
+                f"crypto:{self.instrument_id}:{self.timeframe.value}"
+            )
+            if self.route_key != expected_route_key:
+                raise ValueError(
+                    "Crypto route_key must match instrument and timeframe"
+                )
+        return self
 
 
 class CandidateEvent(ContractModel):

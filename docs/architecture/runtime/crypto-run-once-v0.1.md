@@ -60,7 +60,8 @@ Signal 初始化放在 Candidate 之后。这样 live 行情没有突破时不�
 
 - 构造 4 根当前 UTC 时间之前已收盘的 H1 K 线。
 - 前 3 根形成参考区间，最后一根 close 严格高于参考 high，稳定产生 LONG Candidate。
-- 每次 CLI 调用默认生成新的 `watch_item_id`，允许重复演示且不与活跃 Signal 冲突。
+- CLI 必须接收数据库中 ACTIVE 的 Crypto H1 `watch_item_id`；每次运行只生成新的 `run_id`，
+  不临时创建监控身份。
 - demo 只保证契约和授权链可执行，不代表真实市场判断。
 
 ### 4.2 live
@@ -127,7 +128,8 @@ Run-Once 复用既有三个事务边界：
 
 - CLI 只从 `LOOT_TEST_DATABASE_URL` 或 `%USERPROFILE%/.loot/database.env` 加载测试库 DSN。
 - 输出和异常不得回显 DSN；数据库驱动错误由现有脱敏边界处理。
-- demo 和 live 都只写 `loot_test` 中现有 `loot` schema 的 10 张表。
+- demo 和 live 都先从 `loot_test` 的 WatchItem/Subscription 表读取监控配置，并只通过既有
+  Repository 写入决策链事实；CLI 不执行 DDL。
 - live 只使用 OKX public REST，不需要 API key，不接触账户能力。
 
 ## 9. 验收

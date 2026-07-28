@@ -133,7 +133,8 @@ V0.1 的 Policy Gate 不修改 Proposal。需要降低优先级、改变目标�
 Signal 在开始监控某个 WatchItem、timeframe 和 SignalType 时，由状态机的初始化入口
 幂等创建为 `OBSERVING`。初始化由 MonitoringSubscription 生命周期触发，不需要
 DecisionTicket，因为它不表达市场判断；Agent、Skill、PreFilter 和 Decision Builder
-都不能创建 Signal。初始化之后的任何状态变化都必须持有效 DecisionTicket。
+都不能创建 Signal。初始化之后的任何状态变化都必须持有效 DecisionTicket，唯一例外是状态机
+基于已持久化 Signal 自身 `expires_at` 的确定性 `EXPIRED` 收敛。
 
 状态机只负责：
 
@@ -146,6 +147,11 @@ DecisionTicket，因为它不表达市场判断；Agent、Skill、PreFilter 和 
 - 合法迁移表校验。
 - 通过完整模型校验重建 SignalInstance 投影，禁止绕过契约 validator。
 - 写入 SignalTransition 和 SignalEvent。
+
+确定性到期不属于新的市场决策：State Machine 只在 `expires_at <= detected_at` 时把非终态
+Signal 收敛为 `EXPIRED`，以 `expires_at` 作为迁移时间，写入独立 `SignalExpiryEvent` 和
+Outbox。该受限路径不生成或消费 Ticket，也不读写 Proposal、PolicyEvaluation、Position、
+Direction 或 Actionability；持久化事务必须先记录该事实，再允许下一 generation 初始化。
 
 市场业务条件由各 Market Domain 的 TransitionPolicy 定义。共享状态机引擎只执行
 机械迁移，不把三个市场抽成一套业务规则。
@@ -400,6 +406,21 @@ Evidence 已写入但 Proposal 未生成时允许按同一分析请求恢复，�
 这些操作必须在同一个 PostgreSQL 事务内完成。Redis Streams 只负责投递，不能成为
 Signal 状态或幂等事实源。
 
+### 9.6 Signal 到期收敛事务
+
+```text
+按监控身份加 advisory lock
++ 锁定最新 SignalInstance
++ State Machine 基于 immutable expires_at 判定是否已到期
++ 乐观更新为 EXPIRED（last_transition_at = expires_at）
++ 写入无 decision_ticket_id 的 SignalTransition
++ 写入 SignalExpired Outbox
++ 不写 decision_ticket_consumption
+```
+
+该事务仅为解除已过期 generation 对新 setup 的阻塞；它不能成为 Policy Gate、Agent 或 Worker
+绕过授权链的入口。
+
 建议唯一约束：
 
 ```text
@@ -486,8 +507,10 @@ Phase 0 已落地：
 7. 已完成：增加绑定方向与上下文版本的 Policy 后 `DecisionTicket`。
 8. 已完成：Signal State Machine 从授权事实仓库验证完整链路后执行迁移。
 9. 已完成：补拒绝、延后重评、重复投递、过期 Ticket 和上下文冲突测试。
-10. 当前后续：在 REQ-0008 落地 PostgreSQL、Inbox、Outbox 和乐观锁。
-11. 最后接入 Agent、Alert 和真实调度。
+10. 已完成：在 REQ-0008 落地 PostgreSQL、Inbox、Outbox 和乐观锁。
+11. 已完成：在 REQ-0013/REQ-0014 接入 Run-Once 和持久化监控身份。
+12. 当前：在 REQ-0015 接入常驻调度、Run 账本、租约和恢复。
+13. 后续：完成 Alert 和最小 Replay 后，再以 Shadow Mode 接入 Agent。
 
 契约迁移期间不得同时保留两个同名但不同语义的 DecisionTicket。
 

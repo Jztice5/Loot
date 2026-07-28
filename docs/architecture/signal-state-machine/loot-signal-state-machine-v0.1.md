@@ -75,6 +75,21 @@ V0.1 严格采用闭环设计文档中的最小迁移表：
 
 `INVALIDATED`、`RESOLVED`、`EXPIRED` 当前视为终态，不提供出边。
 
+### 3.1 确定性到期收敛
+
+除初始 `OBSERVING` 外，状态迁移默认必须消费有效的 `DecisionTicket`。唯一受限例外是
+状态机根据当前 `SignalInstance` 已持久化且不可变的 `expires_at`，把仍处于非终态的
+`OBSERVING` 或 `ARMED` 收敛为 `EXPIRED`。该路径不表达新的市场判断，不读取或改写
+Candidate、Proposal、PolicyEvaluation、Position、Direction 或 Actionability。
+
+- 仅在 `expires_at <= detected_at` 时执行，且 `last_transition_at` 固定写为 `expires_at`。
+- 产生独立 `SignalExpiryEvent` 和 `loot.crypto.SignalExpired` Outbox 事件；不得伪造、复用或
+  消费 `DecisionTicket`。
+- `signal_transitions.decision_ticket_id` 仅对这类事实允许为空；常规授权迁移仍必须关联 Ticket。
+- 事件 identity 由 `signal_id + expires_at` 的 UUIDv5 确定，重复检测不得增加版本或新事件。
+- PostgreSQL workflow 必须在监控身份 advisory lock 内先收敛最新过期 generation，再分配下一
+  generation；Worker、Agent、Skill 和 Policy 均不得直接更新 Signal。
+
 ## 4. Apply 语义
 
 当前 `SignalStateMachine.apply(current_signal, decision_ticket, authorization_context)`

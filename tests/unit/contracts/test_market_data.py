@@ -205,6 +205,36 @@ class MarketDataContractTest(unittest.TestCase):
         self.assertEqual(len({item.snapshot_key for item in snapshots}), 3)
         self.assertEqual(len({item.id for item in snapshots}), 3)
 
+    def test_snapshot_identity_ignores_collection_clock_on_retry(self) -> None:
+        """相同市场输入晚些重抓时不能被误判为历史行情修正。"""
+
+        bar = sample_bar(opened_at=aware_now())
+        retried_bar = MarketBar.model_validate(
+            {
+                **bar.model_dump(),
+                "received_at": bar.received_at + timedelta(minutes=5),
+            }
+        )
+        first = MarketSnapshot.from_bars(
+            market=bar.market,
+            instrument_id=bar.instrument_id,
+            timeframe=bar.timeframe,
+            source_provider=bar.provider,
+            as_of=bar.closed_at,
+            bars=[bar],
+        )
+        retry = MarketSnapshot.from_bars(
+            market=bar.market,
+            instrument_id=bar.instrument_id,
+            timeframe=bar.timeframe,
+            source_provider=bar.provider,
+            as_of=bar.closed_at + timedelta(minutes=5),
+            bars=[retried_bar],
+        )
+
+        self.assertEqual(first.snapshot_content_hash, retry.snapshot_content_hash)
+        self.assertEqual(first.id, retry.id)
+
     def test_market_snapshot_rejects_mismatched_content_hash(self) -> None:
         bar = sample_bar()
         snapshot = MarketSnapshot.from_bars(

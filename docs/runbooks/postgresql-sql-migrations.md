@@ -3,9 +3,12 @@
 ## 适用范围
 
 本手册用于通过 DBX 执行 `migrations/versions/` 下的版本化 PostgreSQL SQL 文件。
-当前首个版本为：
+当前版本按顺序为：
 
 - `20260716_0001_crypto_decision_persistence.sql`
+- `20260727_0002_crypto_watchlist_monitoring.sql`
+- `20260728_0003_crypto_monitoring_runs.sql`
+- `20260728_0004_signal_expiry_reconciliation.sql`
 
 SQL migration 只负责数据库结构；应用运行和集成测试始终使用非 DDL 角色 `loot_app`。
 
@@ -26,7 +29,10 @@ SQL migration 只负责数据库结构；应用运行和集成测试始终使用
 2. 打开目标版本 `.sql` 文件并一次执行完整文件，不拆开 `BEGIN` 和 `COMMIT`。
 3. 确认事务成功后，使用 `loot_app` 专用连接重新打开 `loot_test`。
 4. 验证 `current_database()`、`current_user`、`search_path` 和 schema 权限。
-5. 验证 10 张业务表、7 个显式索引和约束均存在。
+5. 验证当前 migration 声明的表、索引和约束均存在。执行 0003 后，`loot` schema 应有
+   15 张业务表；新增运行账本为 `monitoring_runs` 和 `monitoring_run_attempts`。
+   执行 0004 后，`signal_transitions.decision_ticket_id` 可为空，仅用于 State Machine
+   基于 Signal 自身 `expires_at` 写入的确定性 `EXPIRED` 迁移；常规授权迁移仍必须关联 Ticket。
 
 权限探针：
 

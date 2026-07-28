@@ -6,7 +6,7 @@ import argparse
 import json
 from datetime import UTC, datetime
 from typing import Sequence
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -15,13 +15,14 @@ from loot.application import (
     CryptoRunOnceCommand,
     CryptoRunOnceService,
     DemoBreakoutCryptoProvider,
-    default_btc_usdt_instrument,
 )
+from loot.contracts import Timeframe
 from loot.domains.crypto import CryptoPolicyGate, OkxRestCryptoProvider
 from loot.persistence import (
     PostgresAnalysisRepository,
     PostgresAuthorizationRepository,
     PostgresSignalWorkflow,
+    PostgresWatchlistRepository,
     create_postgres_engine,
 )
 from loot.persistence.config import load_local_setting
@@ -38,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=tuple(mode.value for mode in CryptoRunMode),
         default=CryptoRunMode.DEMO.value,
     )
-    parser.add_argument("--watch-item-id", type=UUID, default=None)
+    parser.add_argument("--watch-item-id", type=UUID, required=True)
     parser.add_argument("--context-digest", default="crypto-run-once.cli.v1")
     parser.add_argument("--okx-timeout-seconds", type=float, default=10.0)
     return parser
@@ -65,7 +66,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_error("TEST_DATABASE_REQUIRED", "DatabaseSafetyError")
             return 2
 
-        # 2. 按运行模式装配只读行情 Provider；其余授权和持久化边界保持一致。
+        # 2. 先加载 ACTIVE 的持久化监控身份，任何无效配置都在访问 Provider 前拒绝。
+        run_configuration = PostgresWatchlistRepository(
+            engine
+        ).load_run_configuration(args.watch_item_id, Timeframe.H1)
+
+        # 3. 按运行模式装配只读行情 Provider；其余授权和持久化边界保持一致。
         mode = CryptoRunMode(args.mode)
         provider = (
             DemoBreakoutCryptoProvider(received_at=datetime.now(UTC))
@@ -80,12 +86,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_gate=CryptoPolicyGate(authorization_repository),
         )
 
-        # 3. 每次默认使用新的 WatchItem 身份，允许重复 demo 且不碰已有活跃 Signal。
+        # 4. Run-Once 使用数据库中的 Instrument、WatchItem 版本和 Subscription 周期。
         result = service.run(
             CryptoRunOnceCommand(
                 mode=mode,
-                instrument=default_btc_usdt_instrument(),
-                watch_item_id=args.watch_item_id or uuid4(),
+                instrument=run_configuration.instrument,
+                watch_item_id=run_configuration.watch_item.id,
+                timeframe=run_configuration.subscription.timeframe,
+                watch_item_version=run_configuration.watch_item.version,
                 context_digest=args.context_digest,
             )
         )

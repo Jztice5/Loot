@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from loot.application import (
+    CryptoRunCheckpoint,
     CryptoRunMode,
     CryptoRunOnceCommand,
     CryptoRunOnceService,
@@ -15,7 +16,13 @@ from loot.application import (
     DemoBreakoutCryptoProvider,
     default_btc_usdt_instrument,
 )
-from loot.contracts import DecisionTicket, Direction, SignalState, Timeframe
+from loot.contracts import (
+    DecisionTicket,
+    Direction,
+    MonitoringRunPhase,
+    SignalState,
+    Timeframe,
+)
 from loot.domains.crypto import CryptoPolicyGate, FakeCryptoProvider
 from loot.signals import (
     InMemoryAuthorizationRepository,
@@ -42,6 +49,7 @@ class _InMemorySignalWorkflow:
             request: SignalInitializationRequest,
             *,
             correlation_id: UUID,
+            detected_at: datetime | None = None,
     ) -> SignalInitializationResult:
         """Initialize and retain the current in-memory projection."""
 
@@ -85,6 +93,20 @@ class _RecordingAnalysisRepository:
         """Record one application call for assertion."""
 
         self.calls.append(kwargs)
+
+
+class _FailingProvider:
+    """证明预加载 Snapshot 入口不会再次读取 Provider。"""
+
+    @property
+    def provider_name(self) -> str:
+        return "failing.provider"
+
+    def fetch_recent_bars(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("preloaded execution must not fetch recent bars")
+
+    def fetch_bars_ending_at(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("preloaded execution must not fetch a target window")
 
 
 class CryptoRunOnceServiceTest(unittest.TestCase):
@@ -184,6 +206,48 @@ class CryptoRunOnceServiceTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first.symbol, "BTC-USDT")
         self.assertEqual(first.venue, "OKX")
+
+    def test_preloaded_snapshot_reports_stable_recovery_checkpoints(self) -> None:
+        """Worker 入口跳过 Provider，并让全部阶段复用首次评估时间。"""
+
+        provider = DemoBreakoutCryptoProvider(received_at=self.received_at)
+        snapshot = provider.fetch_bars_ending_at(
+            self.instrument,
+            Timeframe.H1,
+            target_bar_closed_at=self.received_at,
+            limit=4,
+        )
+        authorization_repository = InMemoryAuthorizationRepository()
+        workflow = _InMemorySignalWorkflow(authorization_repository)
+        checkpoints: list[CryptoRunCheckpoint] = []
+        service = CryptoRunOnceService(
+            provider=_FailingProvider(),
+            signal_workflow=workflow,
+            analysis_repository=_RecordingAnalysisRepository(),
+            policy_gate=CryptoPolicyGate(authorization_repository),
+        )
+
+        result = service.run_with_snapshot(
+            self._command(CryptoRunMode.LIVE),
+            snapshot,
+            evaluated_at=self.evaluated_at,
+            on_checkpoint=checkpoints.append,
+        )
+
+        self.assertEqual(result.status, CryptoRunStatus.SIGNAL_TRANSITIONED)
+        self.assertEqual(
+            [item.phase for item in checkpoints],
+            [
+                MonitoringRunPhase.PREFILTERED,
+                MonitoringRunPhase.SIGNAL_INITIALIZED,
+                MonitoringRunPhase.ANALYSIS_PERSISTED,
+                MonitoringRunPhase.POLICY_EVALUATED,
+                MonitoringRunPhase.SIGNAL_APPLIED,
+            ],
+        )
+        self.assertTrue(
+            all(item.evaluated_at == self.evaluated_at for item in checkpoints)
+        )
 
     def _command(self, mode: CryptoRunMode) -> CryptoRunOnceCommand:
         """Build one unique but otherwise stable Run-Once command."""

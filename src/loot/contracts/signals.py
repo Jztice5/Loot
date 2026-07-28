@@ -353,8 +353,8 @@ class SignalInstance(ContractModel):
         DecisionTicket -> SignalStateMachine.apply -> updated SignalInstance
 
     业务规则:
-        direction 进入 setup identity；初始 OBSERVING 没有 Ticket，其他状态必须关联最新
-        Ticket；generation 从 1 开始；终态实例不得被重置。
+        direction 进入 setup identity；初始 OBSERVING 没有 Ticket；确定性到期的 EXPIRED 可保留
+        空 Ticket；其余状态必须关联最新 Ticket；generation 从 1 开始；终态实例不得被重置。
     """
 
     id: UUID
@@ -397,10 +397,11 @@ class SignalInstance(ContractModel):
             )
         if (
                 self.latest_decision_ticket_id is None
-                and self.state != SignalState.OBSERVING
+                and self.state not in {SignalState.OBSERVING, SignalState.EXPIRED}
         ):
             raise ValueError(
-                "latest_decision_ticket_id is required after initial OBSERVING state"
+                "latest_decision_ticket_id is required except for initial OBSERVING "
+                "or deterministic EXPIRED state"
             )
         if self.expires_at is not None and self.expires_at < self.last_transition_at:
             raise ValueError("expires_at must not be earlier than last_transition_at")
@@ -453,4 +454,45 @@ class SignalEvent(ContractModel):
     def _state_must_change(self) -> "SignalEvent":
         if self.from_state == self.to_state:
             raise ValueError("signal event must represent a state change")
+        return self
+
+
+class SignalExpiryEvent(ContractModel):
+    """Signal State Machine 基于自身有效期收敛终态时产生的事实事件。
+
+    该事件不代表 Policy 授权的市场判断，也不复用 Candidate、Proposal、Evaluation 或
+    DecisionTicket 的追踪字段。它只记录已存在 Signal 的 immutable ``expires_at`` 到期后，
+    状态机执行的确定性 ``EXPIRED`` 迁移。
+    """
+
+    event_id: UUID
+    signal_id: UUID
+    market: Market
+    instrument_id: UUID
+    signal_type: SignalType
+    direction: Direction
+    from_state: SignalState
+    to_state: SignalState
+    expires_at: datetime
+    detected_at: datetime
+    dedupe_key: str
+
+    @field_validator("dedupe_key")
+    @classmethod
+    def _non_empty_text(cls, value: str) -> str:
+        return ensure_non_empty(value)
+
+    @field_validator("expires_at", "detected_at")
+    @classmethod
+    def _timestamps_are_utc(cls, value: datetime) -> datetime:
+        return ensure_utc_datetime(value)
+
+    @model_validator(mode="after")
+    def _is_deterministic_expiry(self) -> "SignalExpiryEvent":
+        if self.from_state == self.to_state:
+            raise ValueError("signal expiry event must represent a state change")
+        if self.to_state != SignalState.EXPIRED:
+            raise ValueError("signal expiry event must target EXPIRED")
+        if self.detected_at < self.expires_at:
+            raise ValueError("detected_at must not be earlier than expires_at")
         return self

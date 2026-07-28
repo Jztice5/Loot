@@ -99,10 +99,10 @@ class WatchItem(ContractModel):
     market: Market
     venue: str
     status: WatchItemStatus
-    timeframes: list[Timeframe] = Field(min_length=1)
+    timeframes: tuple[Timeframe, ...] = Field(min_length=1)
     monitoring_profile: str
-    enabled_signal_types: list[SignalType] = Field(default_factory=list)
-    custom_zones: list[PriceZone] = Field(default_factory=list)
+    enabled_signal_types: tuple[SignalType, ...] = Field(default_factory=tuple)
+    custom_zones: tuple[PriceZone, ...] = Field(default_factory=tuple)
     priority: Priority = Priority.NORMAL
     created_at: datetime
     updated_at: datetime
@@ -123,6 +123,12 @@ class WatchItem(ContractModel):
         # 决策注释: 自选配置时间倒退会让订阅重建和变更审计失去确定顺序。
         if self.updated_at < self.created_at:
             raise ValueError("updated_at must not be earlier than created_at")
+        if len(set(self.timeframes)) != len(self.timeframes):
+            raise ValueError("timeframes must not contain duplicates")
+        if len(set(self.enabled_signal_types)) != len(self.enabled_signal_types):
+            raise ValueError("enabled_signal_types must not contain duplicates")
+        if len(set(self.custom_zones)) != len(self.custom_zones):
+            raise ValueError("custom_zones must not contain duplicates")
         return self
 
 

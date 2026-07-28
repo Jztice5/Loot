@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loot Runtime Console</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101417;
+      --surface: #171d21;
+      --surface-2: #20282d;
+      --line: #303a40;
+      --text: #e7edf0;
+      --muted: #8d9aa2;
+      --cyan: #65d4d0;
+      --green: #77d69b;
+      --amber: #edc673;
+      --red: #ef8585;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button { font: inherit; }
+    .shell { max-width: 1440px; margin: 0 auto; padding: 28px 32px 48px; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 24px; }
+    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 4px 0 6px; font-size: 28px; letter-spacing: 0; }
+    .subtitle { margin: 0; color: var(--muted); }
+    .actions { display: flex; align-items: center; gap: 12px; }
+    .status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--line); color: var(--muted); }
+    .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    button { border: 1px solid var(--line); background: var(--surface-2); color: var(--text); padding: 8px 13px; cursor: pointer; }
+    button:hover { border-color: var(--cyan); color: var(--cyan); }
+    button:disabled { cursor: wait; opacity: .6; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric, .panel { border: 1px solid var(--line); background: var(--surface); }
+    .metric { padding: 16px 18px; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric-value { margin-top: 5px; font-size: 24px; font-weight: 700; }
+    .metric-meta { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 16px; }
+    .panel { min-width: 0; }
+    .panel-wide { grid-column: 1 / -1; }
+    .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0; font-size: 16px; }
+    .panel-note { color: var(--muted); font-size: 12px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; }
+    th { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+    .pill { display: inline-block; padding: 3px 7px; border: 1px solid var(--line); font-size: 11px; }
+    .pill-green { border-color: rgba(119,214,155,.45); color: var(--green); }
+    .pill-amber { border-color: rgba(237,198,115,.45); color: var(--amber); }
+    .pill-red { border-color: rgba(239,133,133,.45); color: var(--red); }
+    .pill-cyan { border-color: rgba(101,212,208,.45); color: var(--cyan); }
+    .capabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px 18px; }
+    .capability { display: flex; justify-content: space-between; gap: 10px; padding: 10px; background: var(--surface-2); }
+    .empty, .error { padding: 28px 18px; color: var(--muted); }
+    .error { color: var(--red); }
+    footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 900px) {
+      .shell { padding: 22px 16px 36px; }
+      header { flex-direction: column; }
+      .actions { width: 100%; justify-content: space-between; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+      .panel-wide { grid-column: auto; }
+    }
+    @media (max-width: 520px) {
+      h1 { font-size: 24px; }
+      .metrics { grid-template-columns: 1fr; }
+      .capabilities { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">Crypto First / Local Runtime</div>
+        <h1>Loot Runtime Console</h1>
+        <p class="subtitle">只读观察台 · 当前数据源：loot_test</p>
+      </div>
+      <div class="actions">
+        <span id="database-status" class="status">连接检查中</span>
+        <button id="refresh" type="button">刷新</button>
+      </div>
+    </header>
+
+    <section class="metrics" aria-label="运行概览">
+      <div class="metric"><div class="metric-label">决策链</div><div id="metric-chains" class="metric-value">-</div><div class="metric-meta">Proposal</div></div>
+      <div class="metric"><div class="metric-label">Signal</div><div id="metric-signals" class="metric-value">-</div><div class="metric-meta">当前投影</div></div>
+      <div class="metric"><div class="metric-label">未发布 Outbox</div><div id="metric-outbox" class="metric-value">-</div><div class="metric-meta">待恢复事件</div></div>
+      <div class="metric"><div class="metric-label">最近活动</div><div id="metric-latest" class="metric-value mono">-</div><div class="metric-meta">数据库事实</div></div>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head"><h2>能力状态</h2><span class="panel-note">真实实现边界</span></div>
+        <div id="capabilities" class="capabilities"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>数据库事实</h2><span id="database-name" class="panel-note">-</span></div>
+        <div id="facts" class="capabilities"></div>
+      </article>
+
+      <article class="panel panel-wide">
+        <div class="panel-head"><h2>决策链路</h2><span class="panel-note">最近 Proposal</span></div>
+        <div id="chains" class="table-wrap"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h2>当前 Signal</h2><span class="panel-note">最新投影</span></div>
+        <div id="signals" class="table-wrap"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>Outbox 队列</h2><span class="panel-note">未发布</span></div>
+        <div id="outbox" class="table-wrap"></div>
+      </article>
+    </section>
+
+    <footer id="updated">等待首次刷新</footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const labels = { run_once: "Run-Once", decision_persistence: "决策持久化", monitoring_worker: "常驻 Worker", alert_center: "Alert Center", replay: "Replay" };
+    const escapeHtml = (value) => String(value ?? "-").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[char]));
+    const shortId = (value) => value ? escapeHtml(value.slice(0, 8)) : "-";
+    const time = (value) => value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "-";
+    const pill = (value, type = "cyan") => `<span class="pill pill-${type}">${escapeHtml(value)}</span>`;
+    const statusType = (value) => ["APPROVED", "ARMED", "healthy", "available", "SUCCEEDED"].includes(value) ? "green" : ["DEFERRED", "not_implemented", "OBSERVING"].includes(value) ? "amber" : ["REJECTED", "FAILED", "unavailable"].includes(value) ? "red" : "cyan";
+
+    async function getJson(path) {
+      const response = await fetch(path, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "读取失败");
+      return data;
+    }
+
+    function renderOverview(data) {
+      $("database-status").textContent = data.database.status === "healthy" ? "数据库正常" : "数据库异常";
+      $("database-status").style.color = data.database.status === "healthy" ? "var(--green)" : "var(--red)";
+      $("database-name").textContent = data.database.name;
+      $("metric-chains").textContent = data.facts.decision_proposals;
+      $("metric-signals").textContent = data.facts.signals;
+      $("metric-outbox").textContent = data.facts.unpublished_outbox;
+      $("metric-latest").textContent = time(data.latest_activity_at);
+      $("capabilities").innerHTML = Object.entries(data.capabilities).map(([key, value]) => `<div class="capability"><span>${escapeHtml(labels[key] || key)}</span>${pill(value, statusType(value))}</div>`).join("");
+      $("facts").innerHTML = Object.entries(data.facts).map(([key, value]) => `<div class="capability"><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+    }
+
+    function renderChains(items) {
+      if (!items.length) { $("chains").innerHTML = `<div class="empty">暂无决策链事实</div>`; return; }
+      $("chains").innerHTML = `<table><thead><tr><th>Proposal</th><th>方向</th><th>Policy</th><th>Ticket</th><th>Signal</th><th>迁移</th><th>时间</th></tr></thead><tbody>${items.map((item) => {
+        const p = item.proposal, policy = item.policy, ticket = item.ticket, signal = item.signal, transition = item.transition;
+        return `<tr><td><span class="mono">${shortId(p.id)}</span><br><span class="muted">${escapeHtml(p.market)} / ${escapeHtml(p.timeframe)}</span></td><td>${pill(p.direction, p.direction === "SHORT" ? "red" : "green")}</td><td>${policy ? pill(policy.outcome, statusType(policy.outcome)) : pill("未评估", "amber")}</td><td>${ticket ? pill(shortId(ticket.id), "cyan") : "-"}</td><td>${signal ? `${pill(signal.state, statusType(signal.state))}<br><span class="muted">v${signal.version} / g${signal.generation}</span>` : "-"}</td><td>${transition ? `${escapeHtml(transition.from_state)} → ${escapeHtml(transition.to_state)}` : "-"}</td><td class="muted">${time(p.created_at)}</td></tr>`;
+      }).join("")}</tbody></table>`;
+    }
+
+    function renderSignals(items) {
+      if (!items.length) { $("signals").innerHTML = `<div class="empty">暂无 Signal 事实</div>`; return; }
+      $("signals").innerHTML = `<table><thead><tr><th>状态</th><th>方向</th><th>周期</th><th>版本</th></tr></thead><tbody>${items.map((item) => `<tr><td>${pill(item.state, statusType(item.state))}</td><td>${pill(item.direction, item.direction === "SHORT" ? "red" : "green")}</td><td>${escapeHtml(item.timeframe)}</td><td class="mono">v${item.version} / g${item.generation}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    function renderOutbox(items) {
+      if (!items.length) { $("outbox").innerHTML = `<div class="empty">暂无未发布事件</div>`; return; }
+      $("outbox").innerHTML = `<table><thead><tr><th>事件</th><th>Aggregate</th><th>尝试</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td class="mono">${escapeHtml(item.event_type)}</td><td>${escapeHtml(item.aggregate_type)}<br><span class="mono muted">${shortId(item.aggregate_id)}</span></td><td>${escapeHtml(item.attempt_count)}</td><td class="muted">${time(item.occurred_at)}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    async function refresh() {
+      const button = $("refresh"); button.disabled = true;
+      try {
+        const [overview, chains, signals, outbox] = await Promise.all([getJson("/api/overview"), getJson("/api/chains?limit=20"), getJson("/api/signals?limit=12"), getJson("/api/outbox?limit=12")]);
+        renderOverview(overview); renderChains(chains.items); renderSignals(signals.items); renderOutbox(outbox.items);
+        $("updated").textContent = `最近刷新：${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+      } catch (error) {
+        $("database-status").textContent = "读取失败"; $("database-status").style.color = "var(--red)";
+        ["chains", "signals", "outbox"].forEach((id) => { $(id).innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; });
+      } finally { button.disabled = false; }
+    }
+
+    $("refresh").addEventListener("click", refresh);
+    refresh();
+  </script>
+</body>
+</html>

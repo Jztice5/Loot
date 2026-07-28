@@ -8,6 +8,7 @@ from loot.domains.crypto.decision import (
 from loot.domains.crypto.market_data import (
     CryptoMarketDataProvider,
     CryptoProviderError,
+    CryptoTargetWindowUnavailableError,
     FakeCryptoProvider,
     OkxRestCryptoProvider,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "CryptoPreFilterReason",
     "CryptoPreFilterResult",
     "CryptoProviderError",
+    "CryptoTargetWindowUnavailableError",
     "CryptoPolicyDecision",
     "CryptoPolicyError",
     "CryptoPolicyEvaluationRequest",
