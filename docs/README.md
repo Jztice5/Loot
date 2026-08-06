@@ -53,6 +53,7 @@
 - PostgreSQL SQL Migration：[runbooks/postgresql-sql-migrations.md](runbooks/postgresql-sql-migrations.md)
 - 上下文健康检查：[runbooks/context-health-check.md](runbooks/context-health-check.md)
 - 同步项目 Skills：[runbooks/sync-project-skills.md](runbooks/sync-project-skills.md)
+- Crypto 历史数据集采集：[runbooks/crypto-historical-dataset.md](runbooks/crypto-historical-dataset.md)
 
 ## 项目 Skills
 

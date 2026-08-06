@@ -17,3 +17,6 @@ dist/
 .venv/
 venv/
 .idea/
+
+# Generated Replay datasets are content-addressed local artifacts.
+/data/replay/

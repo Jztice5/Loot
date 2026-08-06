@@ -27,7 +27,8 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from uuid import NAMESPACE_URL, UUID, uuid5
+from pathlib import Path
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from loot.contracts.base import ensure_non_empty, ensure_utc_datetime
 from loot.contracts.enums import Market, Timeframe
@@ -37,6 +38,7 @@ from loot.contracts.replay import (
     HistoricalDatasetManifest,
     HistoricalDatasetQualityReport,
 )
+from loot.contracts.serialization import canonical_json
 
 _H1_DURATION = timedelta(hours=1)
 
@@ -51,6 +53,10 @@ class HistoricalDatasetQualityError(ValueError):
     def __init__(self, report: HistoricalDatasetQualityReport) -> None:
         super().__init__("historical dataset did not pass quality gate")
         self.report = report
+
+
+class HistoricalDatasetArtifactError(ValueError):
+    """历史数据集文件缺失、损坏或与 manifest 不一致。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,10 +272,103 @@ def assess_historical_dataset_quality(
     )
 
 
+def write_historical_dataset(
+    dataset: HistoricalBarDataset,
+    output_root: str | Path,
+) -> Path:
+    """原子写入 manifest、质量报告和有序 MarketBar JSONL。
+
+    业务点:
+        每个 dataset_id 使用独立目录；同内容重试覆盖同名文件，不覆盖其他内容版本。
+
+    调用链:
+        HistoricalBarDataset -> canonical JSON -> atomic replace -> artifact directory
+    """
+
+    dataset_directory = Path(output_root) / str(dataset.manifest.dataset_id)
+    dataset_directory.mkdir(parents=True, exist_ok=True)
+    _atomic_write_text(
+        dataset_directory / "manifest.json",
+        canonical_json(dataset.manifest) + "\n",
+    )
+    _atomic_write_text(
+        dataset_directory / "quality-report.json",
+        canonical_json(dataset.quality_report) + "\n",
+    )
+    bars_payload = "".join(f"{canonical_json(bar)}\n" for bar in dataset.bars)
+    _atomic_write_text(dataset_directory / "bars.jsonl", bars_payload)
+    return dataset_directory
+
+
+def load_historical_dataset(dataset_directory: str | Path) -> HistoricalBarDataset:
+    """加载文件工件并重新验证完整质量与内容 identity。
+
+    业务点:
+        文件只是一种传输形式，不能绕过强类型契约；任何手工修改或不完整复制都会在
+        Replay 消费前失败。
+
+    调用链:
+        artifact files -> contract validation -> quality gate -> rebuilt manifest -> Replay
+    """
+
+    directory = Path(dataset_directory)
+    try:
+        stored_manifest = HistoricalDatasetManifest.model_validate_json(
+            (directory / "manifest.json").read_text(encoding="utf-8")
+        )
+        stored_quality_report = HistoricalDatasetQualityReport.model_validate_json(
+            (directory / "quality-report.json").read_text(encoding="utf-8")
+        )
+        bars_text = (directory / "bars.jsonl").read_text(encoding="utf-8")
+        lines = bars_text.splitlines()
+        if not lines or any(not line.strip() for line in lines):
+            raise HistoricalDatasetArtifactError(
+                "bars.jsonl must contain one non-empty MarketBar per line"
+            )
+        bars = tuple(MarketBar.model_validate_json(line) for line in lines)
+        rebuilt = HistoricalBarDataset.build(
+            provider=stored_manifest.provider,
+            market=stored_manifest.market,
+            instrument_id=stored_manifest.instrument_id,
+            timeframe=stored_manifest.timeframe,
+            start_bar_closed_at=stored_manifest.start_bar_closed_at,
+            end_bar_closed_at=stored_manifest.end_bar_closed_at,
+            bars=bars,
+            generated_at=stored_manifest.generated_at,
+        )
+    except HistoricalDatasetArtifactError:
+        raise
+    except (OSError, ValueError) as error:
+        raise HistoricalDatasetArtifactError(
+            "historical dataset artifact is missing or invalid"
+        ) from error
+
+    if rebuilt.manifest != stored_manifest:
+        raise HistoricalDatasetArtifactError(
+            "historical dataset manifest does not match bar content"
+        )
+    if rebuilt.quality_report != stored_quality_report:
+        raise HistoricalDatasetArtifactError(
+            "historical dataset quality report does not match bar content"
+        )
+    return rebuilt
+
+
 def _dataset_duration(timeframe: Timeframe) -> timedelta:
     if timeframe != Timeframe.H1:
         raise ValueError("historical dataset v0.1 only supports H1")
     return _H1_DURATION
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """在目标目录内写临时文件并原子替换正式工件。"""
+
+    temporary_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary_path.write_text(content, encoding="utf-8", newline="\n")
+        temporary_path.replace(path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _is_h1_boundary(value: datetime) -> bool:

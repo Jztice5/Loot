@@ -35,6 +35,7 @@ Loot 是一个面向个人自选与手动持仓的多市场信号监控系统，
 - Signal State Machine：[docs/architecture/signal-state-machine/loot-signal-state-machine-v0.1.md](docs/architecture/signal-state-machine/loot-signal-state-machine-v0.1.md)
 - 自选与持仓信号监控闭环：[docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md](docs/architecture/signal-monitoring/signal-monitoring-loop-design-v0.1.md)
 - Crypto 行情数据 Provider：[docs/architecture/market-domains/crypto-market-data-provider-v0.1.md](docs/architecture/market-domains/crypto-market-data-provider-v0.1.md)
+- Crypto 历史数据集与 Replay 数据基座：[docs/architecture/testing/crypto-historical-dataset-replay-v0.1.md](docs/architecture/testing/crypto-historical-dataset-replay-v0.1.md)
 
 ## macOS 快速开始
 

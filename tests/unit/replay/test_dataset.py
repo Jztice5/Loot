@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -12,8 +14,11 @@ from pydantic import ValidationError
 from loot.contracts import Market, MarketBar, Timeframe
 from loot.replay import (
     HistoricalBarDataset,
+    HistoricalDatasetArtifactError,
     HistoricalDatasetQualityError,
     assess_historical_dataset_quality,
+    load_historical_dataset,
+    write_historical_dataset,
 )
 
 
@@ -146,6 +151,37 @@ class HistoricalBarDatasetTest(unittest.TestCase):
                     "dataset_id": uuid4(),
                 }
             )
+
+    def test_dataset_artifact_round_trip_preserves_all_facts(self) -> None:
+        dataset = self._build(self._bars(3))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            dataset_directory = write_historical_dataset(dataset, temporary_directory)
+            loaded = load_historical_dataset(dataset_directory)
+
+            self.assertEqual(
+                {path.name for path in dataset_directory.iterdir()},
+                {"manifest.json", "quality-report.json", "bars.jsonl"},
+            )
+            self.assertEqual(loaded, dataset)
+
+    def test_dataset_artifact_rejects_tampered_bar_content(self) -> None:
+        dataset = self._build(self._bars(3))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            dataset_directory = write_historical_dataset(dataset, temporary_directory)
+            bars_path = dataset_directory / "bars.jsonl"
+            rows = bars_path.read_text(encoding="utf-8").splitlines()
+            tampered = json.loads(rows[-1])
+            tampered["volume"] = "999"
+            rows[-1] = json.dumps(tampered, ensure_ascii=True, sort_keys=True)
+            bars_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                HistoricalDatasetArtifactError,
+                "manifest does not match",
+            ):
+                load_historical_dataset(dataset_directory)
 
     def _build(
         self,

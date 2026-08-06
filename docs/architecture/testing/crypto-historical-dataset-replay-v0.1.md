@@ -3,7 +3,7 @@
 | 属性 | 值 |
 |---|---|
 | 状态 | Accepted for implementation |
-| 实现状态 | In Progress |
+| 实现状态 | Implemented；BTC 24 根 smoke 与连续 365 天 8760 根真实采集通过 |
 | 版本 | 0.1 |
 | 日期 | 2026-08-06 |
 | 需求 | REQ-0018 |

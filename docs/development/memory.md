@@ -21,9 +21,10 @@
 
 ## 当前执行与恢复点
 
-- `REQ-0018` 已进入 In Progress，当前切片是 BTC H1 历史数据集与质量门禁：复用生产
-  `MarketBar`，独立建设历史分页、确定性 manifest、质量报告和文件恢复；本阶段不修改生产
-  PreFilter，也不把历史数据写入 Signal 链路。
+- `REQ-0018` 当前唯一 In Progress。BTC H1 历史数据集首切片已完成：复用生产 `MarketBar`，
+  已实现 OKX 向过去分页、确定性 manifest、质量报告、原子文件工件和 CLI；连续 365 天
+  `8760` 根真实数据通过质量检查。当前恢复点是 Replay Engine 与 Outcome Label 组件设计，
+  尚未开始 V0.1 基线统计或 V0.2 调参。
 - `REQ-0015` 已完成；0003 已在 `loot_test` 执行，常驻监控 Worker、Run/Attempt 账本、租约、
   恢复阶段、精确 H1 Provider 和 CLI 已通过真实 PostgreSQL 验收。阶段复核确认当前规则只证明
   工程链路正确，不证明分析有效性。
@@ -63,7 +64,7 @@
 
 ## 当前验证基线
 
-代码验证日期：2026-07-28；需求队列与上下文复核日期：2026-08-04。
+代码、真实历史数据与上下文验证日期：2026-08-06。
 
 环境：
 
@@ -73,6 +74,14 @@
 
 本轮已实际执行：
 
+- `& .\.venv\Scripts\python.exe -m pytest -q`：149 passed。
+- `& .\.venv\Scripts\python.exe -m compileall -q src scripts`：通过。
+- `scripts/fetch_crypto_history.py` 真实 OKX smoke：24 根 BTC-USDT H1 完整通过，数据集
+  `55fa5c7e-692c-5b10-861c-da6c662cec20`，重新加载后 `quality_passed=True`。
+- 同一 CLI 真实采集连续 365 天 `8760` 根 BTC-USDT H1，区间
+  `2025-08-06T09:00:00Z` 至 `2026-08-06T08:00:00Z`，数据集
+  `6b995bda-9b83-5003-9989-feb531c1983d`，内容摘要
+  `a192419d6ccef018201d7bbddca933c68b1184e0db6e8be1643560188d4d3f69`。
 - `& .\.venv\Scripts\python.exe -m pytest -q tests\unit\signals\test_state_machine.py tests\unit\application\test_crypto_run_once.py`：
   22 passed，覆盖到期收敛、重复检测、下一 generation 和 Run-Once 时钟透传。
 - `& .\.venv\Scripts\python.exe -m pytest -q tests\integration\test_crypto_decision_persistence.py`：
