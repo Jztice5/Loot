@@ -64,6 +64,8 @@ class HistoricalDatasetQualityReport(ContractModel):
     identity_mismatch_provider_event_ids: tuple[str, ...] = ()
     out_of_range_provider_event_ids: tuple[str, ...] = ()
     out_of_order_provider_event_ids: tuple[str, ...] = ()
+    invalid_bar_duration_provider_event_ids: tuple[str, ...] = ()
+    misaligned_bar_opened_at_provider_event_ids: tuple[str, ...] = ()
     passed: bool
 
     @field_validator("provider")
@@ -95,6 +97,8 @@ class HistoricalDatasetQualityReport(ContractModel):
         "identity_mismatch_provider_event_ids",
         "out_of_range_provider_event_ids",
         "out_of_order_provider_event_ids",
+        "invalid_bar_duration_provider_event_ids",
+        "misaligned_bar_opened_at_provider_event_ids",
     )
     @classmethod
     def _event_ids_are_present(cls, values: tuple[str, ...]) -> tuple[str, ...]:
@@ -122,6 +126,8 @@ class HistoricalDatasetQualityReport(ContractModel):
                 self.identity_mismatch_provider_event_ids,
                 self.out_of_range_provider_event_ids,
                 self.out_of_order_provider_event_ids,
+                self.invalid_bar_duration_provider_event_ids,
+                self.misaligned_bar_opened_at_provider_event_ids,
             )
         )
         expected_passed = (

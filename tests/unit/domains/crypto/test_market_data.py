@@ -453,11 +453,63 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
         self.assertEqual(len(bars), 4)
         self.assertEqual(len({bar.provider_event_id for bar in bars}), 4)
 
+    def test_okx_provider_rejects_historical_error_response(self) -> None:
+        provider = OkxRestCryptoProvider(
+            http_get=lambda url, timeout: json.dumps(
+                {"code": "50011", "msg": "rate limit"}
+            ).encode("utf-8"),
+        )
+        boundary = datetime(2024, 7, 10, 1, 0, tzinfo=UTC)
+
+        with self.assertRaisesRegex(CryptoProviderError, "rate limit"):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=boundary,
+                end_bar_closed_at=boundary,
+            )
+
+    def test_okx_provider_rejects_unclosed_historical_range(self) -> None:
+        first_opened_at = datetime(2024, 7, 10, tzinfo=UTC)
+        provider = OkxRestCryptoProvider(
+            http_get=lambda url, timeout: self._history_payload(
+                first_opened_at,
+                indexes=(0,),
+                confirm="0",
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CryptoTargetWindowUnavailableError,
+            "complete historical range",
+        ):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=first_opened_at + timedelta(hours=1),
+                end_bar_closed_at=first_opened_at + timedelta(hours=1),
+            )
+
+    def test_okx_provider_rejects_reversed_historical_range_before_request(self) -> None:
+        provider = OkxRestCryptoProvider(
+            http_get=lambda url, timeout: self.fail("must not request invalid range"),
+        )
+        boundary = datetime(2024, 7, 10, 1, 0, tzinfo=UTC)
+
+        with self.assertRaisesRegex(ValueError, "must not be earlier"):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=boundary + timedelta(hours=1),
+                end_bar_closed_at=boundary,
+            )
+
     @staticmethod
     def _history_payload(
         first_opened_at: datetime,
         *,
         indexes: tuple[int, ...],
+        confirm: str = "1",
     ) -> bytes:
         rows = []
         for index in indexes:
@@ -473,7 +525,7 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
                     "10",
                     "10",
                     "1000",
-                    "1",
+                    confirm,
                 ]
             )
         return json.dumps({"code": "0", "msg": "", "data": rows}).encode("utf-8")

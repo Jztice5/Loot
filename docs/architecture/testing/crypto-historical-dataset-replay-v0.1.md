@@ -97,6 +97,7 @@ OKX `history-candles` 返回按时间倒序排列的数据；`after` 表示读�
 - 重复 `closed_at`。
 - 未闭合 K 线。
 - 与目标 market、instrument、provider、timeframe 不一致的 K 线。
+- `opened_at` 未落在 H1 UTC 整点，或 `closed_at - opened_at` 不等于一小时的伪 H1 K 线。
 - 是否通过发布门禁。
 
 质量检查先收集问题再给出报告；只有报告通过时才能生成 manifest。`MarketBar` 自身继续负责
@@ -131,8 +132,10 @@ manifest 固定记录 `schema_version=crypto.market-bars.v1`、数据身份、�
 - `quality-report.json`：完整性检查结果。
 - `bars.jsonl`：按 `opened_at` 升序保存 canonical MarketBar JSON，每行一根。
 
-写入使用临时文件加原子替换；读取时重新运行 MarketBar 契约、质量检查和内容摘要验证。目录
-加入 `.gitignore`，跨设备复现依赖相同命令和 manifest，而不是依赖开发机未说明的缓存。
+写入前重新从 bars 推导 quality report 与 manifest，防止调用方直接构造内存对象绕过 Builder；
+写入使用临时文件加原子替换。读取时重新运行 MarketBar 契约、质量检查和内容摘要验证，并要求
+目录名与 manifest `dataset_id` 一致。目录加入 `.gitignore`，跨设备复现依赖相同命令和
+manifest，而不是依赖开发机未说明的缓存。
 
 ## 9. 错误与恢复
 

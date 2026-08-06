@@ -228,6 +228,24 @@ def assess_historical_dataset_quality(
         )
     )
     out_of_order = _out_of_order_event_ids(input_bars)
+    invalid_duration = tuple(
+        sorted(
+            {
+                bar.provider_event_id
+                for bar in input_bars
+                if bar.closed_at - bar.opened_at != duration
+            }
+        )
+    )
+    misaligned_opened_at = tuple(
+        sorted(
+            {
+                bar.provider_event_id
+                for bar in input_bars
+                if not _is_h1_boundary(bar.opened_at)
+            }
+        )
+    )
     observed_timestamps = sorted(bar.closed_at for bar in input_bars)
     has_quality_issue = any(
         (
@@ -238,6 +256,8 @@ def assess_historical_dataset_quality(
             identity_mismatches,
             out_of_range,
             out_of_order,
+            invalid_duration,
+            misaligned_opened_at,
         )
     )
     passed = len(input_bars) == len(expected_timestamps) and not has_quality_issue
@@ -268,6 +288,8 @@ def assess_historical_dataset_quality(
         identity_mismatch_provider_event_ids=identity_mismatches,
         out_of_range_provider_event_ids=out_of_range,
         out_of_order_provider_event_ids=out_of_order,
+        invalid_bar_duration_provider_event_ids=invalid_duration,
+        misaligned_bar_opened_at_provider_event_ids=misaligned_opened_at,
         passed=passed,
     )
 
@@ -285,6 +307,7 @@ def write_historical_dataset(
         HistoricalBarDataset -> canonical JSON -> atomic replace -> artifact directory
     """
 
+    _assert_dataset_object_is_consistent(dataset)
     dataset_directory = Path(output_root) / str(dataset.manifest.dataset_id)
     dataset_directory.mkdir(parents=True, exist_ok=True)
     _atomic_write_text(
@@ -316,6 +339,10 @@ def load_historical_dataset(dataset_directory: str | Path) -> HistoricalBarDatas
         stored_manifest = HistoricalDatasetManifest.model_validate_json(
             (directory / "manifest.json").read_text(encoding="utf-8")
         )
+        if directory.name != str(stored_manifest.dataset_id):
+            raise HistoricalDatasetArtifactError(
+                "historical dataset directory identity does not match manifest"
+            )
         stored_quality_report = HistoricalDatasetQualityReport.model_validate_json(
             (directory / "quality-report.json").read_text(encoding="utf-8")
         )
@@ -352,6 +379,30 @@ def load_historical_dataset(dataset_directory: str | Path) -> HistoricalBarDatas
             "historical dataset quality report does not match bar content"
         )
     return rebuilt
+
+
+def _assert_dataset_object_is_consistent(dataset: HistoricalBarDataset) -> None:
+    """重新推导公开数据对象，防止直接 dataclass 构造绕过发布门禁。"""
+
+    try:
+        rebuilt = HistoricalBarDataset.build(
+            provider=dataset.manifest.provider,
+            market=dataset.manifest.market,
+            instrument_id=dataset.manifest.instrument_id,
+            timeframe=dataset.manifest.timeframe,
+            start_bar_closed_at=dataset.manifest.start_bar_closed_at,
+            end_bar_closed_at=dataset.manifest.end_bar_closed_at,
+            bars=dataset.bars,
+            generated_at=dataset.manifest.generated_at,
+        )
+    except ValueError as error:
+        raise HistoricalDatasetArtifactError(
+            "historical dataset object does not match its manifest"
+        ) from error
+    if rebuilt != dataset:
+        raise HistoricalDatasetArtifactError(
+            "historical dataset object does not match its manifest"
+        )
 
 
 def _dataset_duration(timeframe: Timeframe) -> timedelta:

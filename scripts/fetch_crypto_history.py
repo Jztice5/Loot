@@ -12,9 +12,10 @@ from typing import Protocol
 from loot.application import default_btc_usdt_instrument
 from loot.contracts import Instrument, MarketBar, Timeframe
 from loot.contracts.base import ensure_utc_datetime
-from loot.domains.crypto import OkxRestCryptoProvider
+from loot.domains.crypto import CryptoProviderError, OkxRestCryptoProvider
 from loot.replay import (
     HistoricalBarDataset,
+    HistoricalDatasetArtifactError,
     HistoricalDatasetQualityError,
     write_historical_dataset,
 )
@@ -152,7 +153,7 @@ def main(
                 {
                     "status": "FAILED",
                     "reason": "DATASET_QUALITY_FAILED",
-                    "error_type": type(error).__name__,
+                    "error_type": "DatasetQualityError",
                     "expected_bar_count": report.expected_bar_count,
                     "actual_bar_count": report.actual_bar_count,
                     "missing_bar_count": len(report.missing_bar_closed_at),
@@ -167,8 +168,14 @@ def main(
             )
         )
         return 1
-    except Exception as error:  # noqa: BLE001 - process boundary redacts diagnostics.
-        _print_error("HISTORICAL_DATASET_FAILED", type(error).__name__)
+    except CryptoProviderError:
+        _print_error("HISTORICAL_PROVIDER_FAILED", "ProviderError")
+        return 1
+    except (HistoricalDatasetArtifactError, OSError):
+        _print_error("HISTORICAL_ARTIFACT_FAILED", "ArtifactError")
+        return 1
+    except Exception:  # noqa: BLE001 - process boundary redacts diagnostics.
+        _print_error("HISTORICAL_DATASET_FAILED", "UnexpectedError")
         return 1
 
 

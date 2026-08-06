@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 
 from pydantic import ValidationError
@@ -130,6 +131,29 @@ class HistoricalBarDatasetTest(unittest.TestCase):
             (wrong_provider.provider_event_id,),
         )
 
+    def test_quality_report_rejects_h1_bar_with_wrong_duration(self) -> None:
+        bars = self._bars(3)
+        short_h1_bar = MarketBar.model_validate(
+            {
+                **bars[0].model_dump(),
+                "opened_at": bars[0].opened_at + timedelta(minutes=30),
+            }
+        )
+
+        report = self._assess((short_h1_bar, bars[1], bars[2]))
+
+        self.assertFalse(report.passed)
+        self.assertEqual(
+            report.invalid_bar_duration_provider_event_ids,
+            (short_h1_bar.provider_event_id,),
+        )
+        self.assertEqual(
+            report.misaligned_bar_opened_at_provider_event_ids,
+            (short_h1_bar.provider_event_id,),
+        )
+        with self.assertRaises(HistoricalDatasetQualityError):
+            self._build((short_h1_bar, bars[1], bars[2]))
+
     def test_build_rejects_out_of_order_input(self) -> None:
         bars = self._bars(3)
 
@@ -182,6 +206,44 @@ class HistoricalBarDatasetTest(unittest.TestCase):
                 "manifest does not match",
             ):
                 load_historical_dataset(dataset_directory)
+
+    def test_dataset_writer_revalidates_directly_constructed_dataset(self) -> None:
+        dataset = self._build(self._bars(3))
+        bypassed = HistoricalBarDataset(
+            manifest=dataset.manifest,
+            quality_report=dataset.quality_report,
+            bars=(),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            with self.assertRaisesRegex(
+                HistoricalDatasetArtifactError,
+                "dataset object does not match",
+            ):
+                write_historical_dataset(bypassed, temporary_directory)
+            self.assertEqual(list(Path(temporary_directory).iterdir()), [])
+
+    def test_dataset_loader_rejects_directory_identity_mismatch(self) -> None:
+        dataset = self._build(self._bars(3))
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            dataset_directory = write_historical_dataset(dataset, temporary_directory)
+            mismatched_directory = dataset_directory.with_name(str(uuid4()))
+            dataset_directory.rename(mismatched_directory)
+
+            with self.assertRaisesRegex(
+                HistoricalDatasetArtifactError,
+                "directory identity does not match",
+            ):
+                load_historical_dataset(mismatched_directory)
+
+    def test_dataset_loader_rejects_missing_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            with self.assertRaisesRegex(
+                HistoricalDatasetArtifactError,
+                "missing or invalid",
+            ):
+                load_historical_dataset(temporary_directory)
 
     def _build(
         self,

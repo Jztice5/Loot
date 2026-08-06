@@ -13,6 +13,7 @@ from pathlib import Path
 from uuid import UUID, uuid5
 
 from loot.contracts import Market, MarketBar, Timeframe
+from loot.domains.crypto import CryptoProviderError
 from scripts import fetch_crypto_history
 
 
@@ -34,6 +35,24 @@ class _HistoricalProvider:
             }
         )
         return self.bars
+
+
+class _FailingHistoricalProvider:
+    """Raise an arbitrary internal error to verify stable CLI redaction."""
+
+    provider_name = "okx.public_rest"
+
+    def fetch_historical_bars(self, instrument, timeframe, **kwargs):
+        raise RuntimeError("secret provider implementation detail")
+
+
+class _UnavailableHistoricalProvider:
+    """Raise a Provider error to verify the public CLI category."""
+
+    provider_name = "okx.public_rest"
+
+    def fetch_historical_bars(self, instrument, timeframe, **kwargs):
+        raise CryptoProviderError("secret upstream response")
 
 
 class FetchCryptoHistoryCliTest(unittest.TestCase):
@@ -100,6 +119,45 @@ class FetchCryptoHistoryCliTest(unittest.TestCase):
             self.assertEqual(payload["reason"], "DATASET_QUALITY_FAILED")
             self.assertEqual(payload["missing_bar_count"], 1)
             self.assertEqual(list(Path(temporary_directory).iterdir()), [])
+
+    def test_cli_maps_unexpected_failures_to_stable_error_category(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = fetch_crypto_history.main(
+                [
+                    "--start-closed-at",
+                    self.first_closed_at.isoformat(),
+                    "--end-closed-at",
+                    self.first_closed_at.isoformat(),
+                ],
+                provider=_FailingHistoricalProvider(),
+                clock=lambda: self.generated_at,
+            )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["error_type"], "UnexpectedError")
+        self.assertNotIn("RuntimeError", output.getvalue())
+        self.assertNotIn("secret", output.getvalue())
+
+    def test_cli_maps_provider_failures_to_stable_error_category(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = fetch_crypto_history.main(
+                [
+                    "--start-closed-at",
+                    self.first_closed_at.isoformat(),
+                    "--end-closed-at",
+                    self.first_closed_at.isoformat(),
+                ],
+                provider=_UnavailableHistoricalProvider(),
+            )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["error_type"], "ProviderError")
+        self.assertEqual(payload["reason"], "HISTORICAL_PROVIDER_FAILED")
+        self.assertNotIn("secret", output.getvalue())
 
     def _bars(self, count: int) -> tuple[MarketBar, ...]:
         bars = []

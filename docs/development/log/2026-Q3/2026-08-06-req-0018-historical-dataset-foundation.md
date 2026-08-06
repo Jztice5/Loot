@@ -46,7 +46,7 @@ Dataset identity 复用 MarketSnapshot 的 canonical 内容指纹，排除 `rece
 
 验证环境：Windows PowerShell，Codex bundled Python 3.12.13，日期 2026-08-06。
 
-- 全量测试：`149 passed in 10.47s`。
+- 全量测试：审查修复后 `158 passed in 12.71s`。
 - 真实 24 根 smoke：数据集 `55fa5c7e-692c-5b10-861c-da6c662cec20`，加载后质量通过。
 - 真实连续 365 天：`8760` 根，数据集 `6b995bda-9b83-5003-9989-feb531c1983d`，
   内容摘要 `a192419d6ccef018201d7bbddca933c68b1184e0db6e8be1643560188d4d3f69`。
@@ -56,6 +56,9 @@ Dataset identity 复用 MarketSnapshot 的 canonical 内容指纹，排除 `rece
 
 - OKX 分页边界可能重复返回相同 K 线；实现按 provider_event_id 去重，并忽略仅采集时钟不同的
   重复事实。相同事件的市场事实冲突仍按 Provider 错误拒绝。
+- 独立代码审查发现初版仅校验连续 `closed_at`，没有验证实际 H1 时长；公开 dataclass 也可能
+  被直接构造后交给 Writer，Loader 则未绑定目录名。提交前已增加 H1 时长/整点校验、Writer
+  重新推导门禁和目录 `dataset_id` 绑定，并为三条路径增加回归测试。
 - 当前只建立历史输入地基，尚不能输出命中率、MFE、MAE、1R/2R 或 V0.2 有效性结论。
 
 ## 当时遗留事项（历史快照）
