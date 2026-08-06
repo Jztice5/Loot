@@ -21,9 +21,12 @@
 
 ## 当前执行与恢复点
 
+- `REQ-0018` 已进入 In Progress，当前切片是 BTC H1 历史数据集与质量门禁：复用生产
+  `MarketBar`，独立建设历史分页、确定性 manifest、质量报告和文件恢复；本阶段不修改生产
+  PreFilter，也不把历史数据写入 Signal 链路。
 - `REQ-0015` 已完成；0003 已在 `loot_test` 执行，常驻监控 Worker、Run/Attempt 账本、租约、
   恢复阶段、精确 H1 Provider 和 CLI 已通过真实 PostgreSQL 验收。阶段复核确认当前规则只证明
-  工程链路正确，不证明分析有效性；下一需求已调整为 `REQ-0018`，状态为 Planned，尚未实现。
+  工程链路正确，不证明分析有效性。
 - `REQ-0014` 已完成 Crypto WatchItem、MonitoringSubscription 生命周期和 Run-Once 持久化
   身份接入；`loot_test` 保留一条 ACTIVE BTC-USDT H1 配置及其 LONG/ARMED demo 事实，详见
   [过程记录](log/2026-Q3/2026-07-27-req-0014-crypto-watchlist-monitoring.md)。

@@ -7,6 +7,9 @@
 
 需求来源：[需求管理 2026-Q3](需求管理-2026-Q3.md)。
 
+当前实施切片：[Crypto Historical Dataset Foundation Implementation Plan](REQ-0018-crypto-historical-dataset-foundation-plan.md)。
+对应稳定设计：[Crypto 历史数据集与 Replay 数据基座 V0.1](../../architecture/testing/crypto-historical-dataset-replay-v0.1.md)。
+
 ## 开始前设计门禁
 
 实现前必须完成并评审组件设计，至少固定：
