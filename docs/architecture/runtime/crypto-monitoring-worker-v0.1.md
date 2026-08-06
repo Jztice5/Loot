@@ -3,7 +3,7 @@
 | 属性 | 值 |
 |---|---|
 | 状态 | Accepted for implementation |
-| 实现状态 | Code complete; loot_test 0003 migration and PostgreSQL acceptance pending |
+| 实现状态 | Implemented；loot_test 0003/0004 migration 与 PostgreSQL 验收通过 |
 | 版本 | 0.1 |
 | 日期 | 2026-07-28 |
 | 需求 | REQ-0015 |
