@@ -43,6 +43,10 @@ from loot.contracts.portfolio import (
     VersionedCondition,
     WatchItem,
 )
+from loot.contracts.replay import (
+    HistoricalDatasetManifest,
+    HistoricalDatasetQualityReport,
+)
 from loot.contracts.signals import (
     DecisionProposal,
     DecisionTicket,
@@ -68,6 +72,8 @@ __all__ = [
     "Instrument",
     "InstrumentStatus",
     "InstrumentType",
+    "HistoricalDatasetManifest",
+    "HistoricalDatasetQualityReport",
     "Market",
     "MarketBar",
     "MarketBarClosedEvent",
