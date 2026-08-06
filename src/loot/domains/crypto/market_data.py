@@ -339,8 +339,11 @@ class OkxRestCryptoProvider:
             }
         )
         url = f"{self.base_url.rstrip('/')}/api/v5/market/candles?{query}"
-        raw_payload = (self.http_get or _default_http_get)(url, self.timeout_seconds)
-        payload = json.loads(raw_payload.decode("utf-8"))
+        payload = _request_json_payload(
+            self.http_get or _default_http_get,
+            url,
+            self.timeout_seconds,
+        )
 
         if payload.get("code") != "0":
             message = payload.get("msg") or "unknown OKX market data error"
@@ -408,8 +411,11 @@ class OkxRestCryptoProvider:
             }
         )
         url = f"{self.base_url.rstrip('/')}/api/v5/market/history-candles?{query}"
-        raw_payload = (self.http_get or _default_http_get)(url, self.timeout_seconds)
-        payload = json.loads(raw_payload.decode("utf-8"))
+        payload = _request_json_payload(
+            self.http_get or _default_http_get,
+            url,
+            self.timeout_seconds,
+        )
         rows = _okx_data_rows(payload)
 
         received_at = datetime.now(UTC)
@@ -490,8 +496,11 @@ class OkxRestCryptoProvider:
                 }
             )
             url = f"{self.base_url.rstrip('/')}/api/v5/market/history-candles?{query}"
-            raw_payload = (self.http_get or _default_http_get)(url, self.timeout_seconds)
-            payload = json.loads(raw_payload.decode("utf-8"))
+            payload = _request_json_payload(
+                self.http_get or _default_http_get,
+                url,
+                self.timeout_seconds,
+            )
             rows = _okx_historical_page_rows(payload)
             if not rows:
                 raise CryptoTargetWindowUnavailableError(
@@ -584,6 +593,16 @@ def _default_http_get(url: str, timeout_seconds: float) -> bytes:
     )
     with urlopen(request, timeout=timeout_seconds) as response:
         return response.read()
+
+
+def _request_json_payload(http_get: HttpGet, url: str, timeout_seconds: float) -> object:
+    """读取并解析 OKX JSON，统一把网络和编码失败收敛为 Provider 错误。"""
+
+    try:
+        raw_payload = http_get(url, timeout_seconds)
+        return json.loads(raw_payload.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise CryptoProviderError("OKX market data request failed") from error
 
 
 def _ensure_crypto_instrument(instrument: Instrument) -> None:

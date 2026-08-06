@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
+from urllib.error import URLError
 
 from loot.application import default_btc_usdt_instrument
 from loot.contracts import Instrument, MarketBar, Timeframe
@@ -169,6 +170,9 @@ def main(
         )
         return 1
     except CryptoProviderError:
+        _print_error("HISTORICAL_PROVIDER_FAILED", "ProviderError")
+        return 1
+    except (URLError, TimeoutError):
         _print_error("HISTORICAL_PROVIDER_FAILED", "ProviderError")
         return 1
     except (HistoricalDatasetArtifactError, OSError):

@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from urllib.error import URLError
 from uuid import UUID, uuid5
 
 from loot.contracts import Market, MarketBar, Timeframe
@@ -53,6 +54,15 @@ class _UnavailableHistoricalProvider:
 
     def fetch_historical_bars(self, instrument, timeframe, **kwargs):
         raise CryptoProviderError("secret upstream response")
+
+
+class _NetworkFailingHistoricalProvider:
+    """Raise a raw URL error to verify network failures outrank file OSError."""
+
+    provider_name = "okx.public_rest"
+
+    def fetch_historical_bars(self, instrument, timeframe, **kwargs):
+        raise URLError("secret upstream host")
 
 
 class FetchCryptoHistoryCliTest(unittest.TestCase):
@@ -158,6 +168,25 @@ class FetchCryptoHistoryCliTest(unittest.TestCase):
         self.assertEqual(payload["error_type"], "ProviderError")
         self.assertEqual(payload["reason"], "HISTORICAL_PROVIDER_FAILED")
         self.assertNotIn("secret", output.getvalue())
+
+    def test_cli_does_not_misclassify_network_error_as_artifact_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = fetch_crypto_history.main(
+                [
+                    "--start-closed-at",
+                    self.first_closed_at.isoformat(),
+                    "--end-closed-at",
+                    self.first_closed_at.isoformat(),
+                ],
+                provider=_NetworkFailingHistoricalProvider(),
+            )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["error_type"], "ProviderError")
+        self.assertEqual(payload["reason"], "HISTORICAL_PROVIDER_FAILED")
+        self.assertNotEqual(payload["error_type"], "ArtifactError")
 
     def _bars(self, count: int) -> tuple[MarketBar, ...]:
         bars = []

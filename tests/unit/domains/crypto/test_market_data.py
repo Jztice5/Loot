@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import UTC, datetime, timedelta
+from urllib.error import URLError
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
@@ -462,6 +463,22 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
         boundary = datetime(2024, 7, 10, 1, 0, tzinfo=UTC)
 
         with self.assertRaisesRegex(CryptoProviderError, "rate limit"):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=boundary,
+                end_bar_closed_at=boundary,
+            )
+
+    def test_okx_provider_wraps_historical_network_error(self) -> None:
+        provider = OkxRestCryptoProvider(
+            http_get=lambda url, timeout: (_ for _ in ()).throw(
+                URLError("secret upstream host")
+            ),
+        )
+        boundary = datetime(2024, 7, 10, 1, 0, tzinfo=UTC)
+
+        with self.assertRaisesRegex(CryptoProviderError, "request failed"):
             provider.fetch_historical_bars(
                 sample_crypto_instrument(),
                 Timeframe.H1,

@@ -74,7 +74,7 @@
 
 本轮已实际执行：
 
-- `& .\.venv\Scripts\python.exe -m pytest -q`：158 passed。
+- `& .\.venv\Scripts\python.exe -m pytest -q`：160 passed。
 - `& .\.venv\Scripts\python.exe -m compileall -q src scripts`：通过。
 - `scripts/fetch_crypto_history.py` 真实 OKX smoke：24 根 BTC-USDT H1 完整通过，数据集
   `55fa5c7e-692c-5b10-861c-da6c662cec20`，重新加载后 `quality_passed=True`。
