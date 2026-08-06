@@ -24,7 +24,7 @@
 - `REQ-0018` 当前唯一 In Progress。BTC H1 历史数据集首切片已完成：复用生产 `MarketBar`，
   已实现 OKX 向过去分页、确定性 manifest、质量报告、原子文件工件和 CLI；连续 365 天
   `8760` 根真实数据通过质量检查。当前恢复点是 Replay Engine 与 Outcome Label 组件设计，
-  尚未开始 V0.1 基线统计或 V0.2 调参。
+  尚未开始 V0.1 基线统计或 V0.2 调参；首切片独立代码评审已关闭全部 Critical/Important。
 - `REQ-0015` 已完成；0003 已在 `loot_test` 执行，常驻监控 Worker、Run/Attempt 账本、租约、
   恢复阶段、精确 H1 Provider 和 CLI 已通过真实 PostgreSQL 验收。阶段复核确认当前规则只证明
   工程链路正确，不证明分析有效性。
