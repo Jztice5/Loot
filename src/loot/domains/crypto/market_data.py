@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -39,6 +40,8 @@ from loot.contracts.base import ensure_utc_datetime
 from loot.contracts.market_data import MarketBar, MarketSnapshot
 
 HttpGet = Callable[[str, float], bytes]
+Sleeper = Callable[[float], None]
+Clock = Callable[[], datetime]
 
 _TIMEFRAME_DURATION: dict[Timeframe, timedelta] = {
     Timeframe.M1: timedelta(minutes=1),
@@ -59,6 +62,10 @@ _OKX_BAR_CODE: dict[Timeframe, str] = {
     Timeframe.D1: "1D",
     Timeframe.W1: "1W",
 }
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class CryptoProviderError(RuntimeError):
@@ -292,6 +299,9 @@ class OkxRestCryptoProvider:
     base_url: str = "https://www.okx.com"
     timeout_seconds: float = 5.0
     http_get: HttpGet | None = None
+    sleep: Sleeper = time.sleep
+    clock: Clock = _utc_now
+    history_request_interval_seconds: float = 0.11
 
     @property
     def provider_name(self) -> str:
@@ -429,6 +439,104 @@ class OkxRestCryptoProvider:
             as_of=received_at,
         )
 
+    def fetch_historical_bars(
+        self,
+        instrument: Instrument,
+        timeframe: Timeframe,
+        *,
+        start_bar_closed_at: datetime,
+        end_bar_closed_at: datetime,
+        page_limit: int = 300,
+    ) -> tuple[MarketBar, ...]:
+        """读取包含首尾的连续历史 H1 K 线区间。
+
+        业务点:
+            REQ-0018 使用该入口构建版本化研究数据集；它独立于 Worker 的短窗口 Provider
+            Protocol，不改变在线监控调用面。
+
+        调用链:
+            validate range -> page OKX history backwards -> normalize MarketBar
+            -> verify exact closed timestamps -> HistoricalBarDataset
+
+        幂等/恢复:
+            `after` 游标严格使用每页最旧 opened_at 向过去推进；重复页或覆盖不足直接失败，
+            由上层重新执行整段采集，不能发布部分数据。
+        """
+
+        _ensure_crypto_instrument(instrument)
+        if instrument.venue.upper() != "OKX":
+            raise ValueError("OkxRestCryptoProvider only accepts venue=OKX instruments")
+        _ensure_limit(page_limit, max_limit=300)
+        if self.history_request_interval_seconds < 0:
+            raise ValueError("history_request_interval_seconds must not be negative")
+
+        start = _ensure_h1_target(start_bar_closed_at, timeframe)
+        end = _ensure_h1_target(end_bar_closed_at, timeframe)
+        if end < start:
+            raise ValueError("end_bar_closed_at must not be earlier than start_bar_closed_at")
+
+        duration = _timeframe_duration(timeframe)
+        start_opened_at = start - duration
+        cursor = end
+        bars_by_event_id: dict[str, MarketBar] = {}
+
+        while True:
+            query = urlencode(
+                {
+                    "instId": instrument.symbol,
+                    "bar": _okx_bar_code(timeframe),
+                    "after": str(int(cursor.timestamp() * 1000)),
+                    "limit": str(page_limit),
+                }
+            )
+            url = f"{self.base_url.rstrip('/')}/api/v5/market/history-candles?{query}"
+            raw_payload = (self.http_get or _default_http_get)(url, self.timeout_seconds)
+            payload = json.loads(raw_payload.decode("utf-8"))
+            rows = _okx_historical_page_rows(payload)
+            if not rows:
+                raise CryptoTargetWindowUnavailableError(
+                    "OKX did not return the complete historical range"
+                )
+
+            received_at = self.clock()
+            page_bars = tuple(
+                self._parse_candle_row(
+                    instrument,
+                    timeframe,
+                    row,
+                    received_at=received_at,
+                )
+                for row in rows
+            )
+            oldest_opened_at = min(bar.opened_at for bar in page_bars)
+            for bar in page_bars:
+                if not bar.is_closed or not (start <= bar.closed_at <= end):
+                    continue
+                existing = bars_by_event_id.get(bar.provider_event_id)
+                if existing is not None and not _same_market_bar_fact(existing, bar):
+                    raise CryptoProviderError(
+                        "OKX returned conflicting facts for one historical candle"
+                    )
+                bars_by_event_id[bar.provider_event_id] = bar
+
+            if oldest_opened_at <= start_opened_at:
+                break
+            if oldest_opened_at >= cursor:
+                raise CryptoProviderError("OKX historical cursor did not advance")
+
+            self.sleep(self.history_request_interval_seconds)
+            cursor = oldest_opened_at
+
+        ordered_bars = tuple(
+            sorted(bars_by_event_id.values(), key=lambda bar: bar.opened_at)
+        )
+        expected_closed_at = _closed_at_range(start, end, duration)
+        if tuple(bar.closed_at for bar in ordered_bars) != expected_closed_at:
+            raise CryptoTargetWindowUnavailableError(
+                "OKX did not return the complete historical range"
+            )
+        return ordered_bars
+
     def _parse_candle_row(
         self,
         instrument: Instrument,
@@ -518,6 +626,20 @@ def _okx_data_rows(payload: object) -> list[object]:
     return rows
 
 
+def _okx_historical_page_rows(payload: object) -> list[object]:
+    """校验历史分页响应，允许空页由区间采集器解释为覆盖不足。"""
+
+    if not isinstance(payload, dict) or payload.get("code") != "0":
+        message = payload.get("msg") if isinstance(payload, dict) else None
+        raise CryptoProviderError(
+            f"OKX candles request failed: {message or 'unknown market data error'}"
+        )
+    rows = payload.get("data")
+    if not isinstance(rows, list):
+        raise CryptoProviderError("OKX candles response did not include data rows")
+    return rows
+
+
 def _okx_request_limit(limit: int, *, include_unclosed: bool) -> int:
     if include_unclosed:
         return limit
@@ -540,6 +662,23 @@ def _timeframe_duration(timeframe: Timeframe) -> timedelta:
         return _TIMEFRAME_DURATION[timeframe]
     except KeyError as exc:
         raise ValueError(f"unsupported timeframe: {timeframe}") from exc
+
+
+def _closed_at_range(
+    start: datetime,
+    end: datetime,
+    duration: timedelta,
+) -> tuple[datetime, ...]:
+    count = int((end - start) / duration) + 1
+    return tuple(start + duration * index for index in range(count))
+
+
+def _same_market_bar_fact(first: MarketBar, second: MarketBar) -> bool:
+    """比较会进入行情内容指纹的事实，忽略仅用于采集审计的 received_at。"""
+
+    return first.model_dump(exclude={"received_at"}) == second.model_dump(
+        exclude={"received_at"}
+    )
 
 
 def _okx_bar_code(timeframe: Timeframe) -> str:

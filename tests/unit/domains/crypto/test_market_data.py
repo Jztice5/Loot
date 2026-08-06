@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from loot.contracts import Instrument, InstrumentStatus, InstrumentType, Market, Timeframe
@@ -330,6 +331,152 @@ class OkxRestCryptoProviderTest(unittest.TestCase):
                 target_bar_closed_at=datetime(2024, 7, 10, 2, 0, tzinfo=UTC),
                 limit=1,
             )
+
+    def test_okx_provider_fetches_complete_historical_range_across_pages(self) -> None:
+        first_opened_at = datetime(2024, 7, 10, tzinfo=UTC)
+        responses = [
+            self._history_payload(first_opened_at, indexes=(3, 2)),
+            self._history_payload(first_opened_at, indexes=(1, 0)),
+        ]
+        captured_urls: list[str] = []
+        sleep_calls: list[float] = []
+
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            captured_urls.append(url)
+            return responses[len(captured_urls) - 1]
+
+        provider = OkxRestCryptoProvider(
+            http_get=fake_http_get,
+            sleep=sleep_calls.append,
+            history_request_interval_seconds=0.11,
+        )
+        bars = provider.fetch_historical_bars(
+            sample_crypto_instrument(),
+            Timeframe.H1,
+            start_bar_closed_at=first_opened_at + timedelta(hours=1),
+            end_bar_closed_at=first_opened_at + timedelta(hours=4),
+            page_limit=2,
+        )
+
+        self.assertEqual([bar.opened_at for bar in bars], [
+            first_opened_at + timedelta(hours=index) for index in range(4)
+        ])
+        first_query = parse_qs(urlparse(captured_urls[0]).query)
+        second_query = parse_qs(urlparse(captured_urls[1]).query)
+        self.assertEqual(
+            first_query["after"],
+            [str(int((first_opened_at + timedelta(hours=4)).timestamp() * 1000))],
+        )
+        self.assertEqual(
+            second_query["after"],
+            [str(int((first_opened_at + timedelta(hours=2)).timestamp() * 1000))],
+        )
+        self.assertEqual(sleep_calls, [0.11])
+
+    def test_okx_provider_rejects_incomplete_historical_range(self) -> None:
+        first_opened_at = datetime(2024, 7, 10, tzinfo=UTC)
+        responses = [
+            self._history_payload(first_opened_at, indexes=(3, 2)),
+            json.dumps({"code": "0", "msg": "", "data": []}).encode("utf-8"),
+        ]
+        call_count = 0
+
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            nonlocal call_count
+            response = responses[call_count]
+            call_count += 1
+            return response
+
+        provider = OkxRestCryptoProvider(http_get=fake_http_get, sleep=lambda seconds: None)
+
+        with self.assertRaisesRegex(
+            CryptoTargetWindowUnavailableError,
+            "complete historical range",
+        ):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=first_opened_at + timedelta(hours=1),
+                end_bar_closed_at=first_opened_at + timedelta(hours=4),
+                page_limit=2,
+            )
+
+    def test_okx_provider_rejects_historical_cursor_without_progress(self) -> None:
+        first_opened_at = datetime(2024, 7, 10, tzinfo=UTC)
+        repeated_page = self._history_payload(first_opened_at, indexes=(3, 2))
+        provider = OkxRestCryptoProvider(
+            http_get=lambda url, timeout: repeated_page,
+            sleep=lambda seconds: None,
+        )
+
+        with self.assertRaisesRegex(CryptoProviderError, "cursor did not advance"):
+            provider.fetch_historical_bars(
+                sample_crypto_instrument(),
+                Timeframe.H1,
+                start_bar_closed_at=first_opened_at + timedelta(hours=1),
+                end_bar_closed_at=first_opened_at + timedelta(hours=4),
+                page_limit=2,
+            )
+
+    def test_okx_provider_deduplicates_identical_historical_page_overlap(self) -> None:
+        first_opened_at = datetime(2024, 7, 10, tzinfo=UTC)
+        responses = [
+            self._history_payload(first_opened_at, indexes=(3, 2)),
+            self._history_payload(first_opened_at, indexes=(2, 1)),
+            self._history_payload(first_opened_at, indexes=(1, 0)),
+        ]
+        page_clocks = iter(
+            datetime(2026, 8, 6, minute=index, tzinfo=UTC) for index in range(3)
+        )
+        call_count = 0
+
+        def fake_http_get(url: str, timeout: float) -> bytes:
+            nonlocal call_count
+            response = responses[call_count]
+            call_count += 1
+            return response
+
+        provider = OkxRestCryptoProvider(
+            http_get=fake_http_get,
+            sleep=lambda seconds: None,
+            clock=lambda: next(page_clocks),
+        )
+
+        bars = provider.fetch_historical_bars(
+            sample_crypto_instrument(),
+            Timeframe.H1,
+            start_bar_closed_at=first_opened_at + timedelta(hours=1),
+            end_bar_closed_at=first_opened_at + timedelta(hours=4),
+            page_limit=2,
+        )
+
+        self.assertEqual(len(bars), 4)
+        self.assertEqual(len({bar.provider_event_id for bar in bars}), 4)
+
+    @staticmethod
+    def _history_payload(
+        first_opened_at: datetime,
+        *,
+        indexes: tuple[int, ...],
+    ) -> bytes:
+        rows = []
+        for index in indexes:
+            opened_at = first_opened_at + timedelta(hours=index)
+            open_price = 100 + index
+            rows.append(
+                [
+                    str(int(opened_at.timestamp() * 1000)),
+                    str(open_price),
+                    str(open_price + 2),
+                    str(open_price - 2),
+                    str(open_price + 1),
+                    "10",
+                    "10",
+                    "1000",
+                    "1",
+                ]
+            )
+        return json.dumps({"code": "0", "msg": "", "data": rows}).encode("utf-8")
 
 
 if __name__ == "__main__":
